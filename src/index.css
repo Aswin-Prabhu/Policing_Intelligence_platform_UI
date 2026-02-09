@@ -1,0 +1,265 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Default (dark) palette - deep navy with subtle contrast */
+  --app-background: #050816;
+  --card-background: #0b1120;
+  --secondary-background: #020617;
+  --accent-background: #111827;
+  --muted-foreground: #9ca3af;
+  --border-color: #1f2937;
+}
+
+html[data-theme='light'] {
+  /* Modern light palette: warm-neutral with a soft blue accent */
+  --app-background: #f5f7fb;       /* page background */
+  --card-background: #ffffff;      /* primary cards / containers */
+  --secondary-background: #f9fafb; /* subtle sections / side panels */
+  --accent-background: #e3edff;    /* headers, search, light accent */
+  --muted-foreground: #4b5563;
+  --border-color: #e1e5ef;
+}
+
+body {
+  background: var(--app-background);
+}
+
+.bg-background {
+  background-color: var(--app-background);
+}
+
+.bg-card {
+  background-color: var(--card-background);
+}
+
+.bg-secondary {
+  background-color: var(--secondary-background);
+}
+
+.bg-accent {
+  background-color: var(--accent-background);
+}
+
+.text-muted-foreground {
+  color: var(--muted-foreground);
+}
+
+.border-border {
+  border-color: var(--border-color);
+}
+
+.divide-border>*+* {
+  border-top: 1px solid var(--border-color);
+}
+
+.card-shadow {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+html[data-theme='dark'] .card-shadow {
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
+}
+
+.hover-elevate {
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.hover-elevate:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+html[data-theme='dark'] .hover-elevate:hover {
+  box-shadow: 0 14px 50px rgba(0, 0, 0, 0.35);
+}
+
+.smooth-transition {
+  transition: all 200ms ease;
+}
+
+/* Leaflet dark UI tuning to match dashboard look */
+.leaflet-container {
+  background: #eef2f7;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji",
+    "Segoe UI Emoji";
+}
+
+/* Light/Dark app-wide overrides for common Tailwind arbitrary colors used in the app */
+html[data-theme='light'] .bg-\[\#0d1117\] {
+  background-color: #ffffff !important;
+}
+
+html[data-theme='light'] .bg-\[\#0a0e1a\] {
+  background-color: #f9fafb !important;
+}
+
+html[data-theme='light'] .border-\[\#1f2937\] {
+  border-color: #e5e7eb !important;
+}
+
+html[data-theme='light'] .text-white {
+  color: #111827 !important;
+}
+
+html[data-theme='light'] .text-gray-300 {
+  color: #374151 !important;
+}
+
+html[data-theme='light'] .text-gray-400 {
+  color: #6b7280 !important;
+}
+
+html[data-theme='light'] .text-gray-500 {
+  color: #9ca3af !important;
+}
+
+html[data-theme='light'] .text-gray-600 {
+  color: #6b7280 !important;
+}
+
+html[data-theme='light'] .hover\:bg-white\/5:hover {
+  background-color: rgba(0, 0, 0, 0.03) !important;
+}
+
+html[data-theme='light'] .hover\:text-white:hover {
+  color: #111827 !important;
+}
+
+/* Dropdown hover states in light theme */
+html[data-theme='light'] .hover\:bg-white\/5:hover {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+  color: #111827 !important;
+}
+
+html[data-theme='light'] .hover\:bg-red-500\/10:hover {
+  background-color: rgba(239, 68, 68, 0.1) !important;
+  color: #dc2626 !important;
+}
+
+/* Default text color in light theme – dark, but allow components to override if needed */
+html[data-theme='light'] body {
+  color: #111827;
+}
+
+/* Make form controls (like filters/dropdowns) clearly readable in light theme */
+html[data-theme='light'] select,
+html[data-theme='light'] option,
+html[data-theme='light'] button,
+html[data-theme='light'] input,
+html[data-theme='light'] textarea {
+  color: #111827;
+  background-color: #ffffff;
+}
+
+/* Theme toggle (sun/moon pill) */
+.kkn-theme-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(31, 41, 55, 0.5);
+  background: rgba(255, 255, 255, 0.08);
+  color: #9ca3af;
+}
+
+html[data-theme='light'] .kkn-theme-toggle {
+  border-color: rgba(17, 24, 39, 0.15);
+  background: rgba(255, 255, 255, 0.85);
+  color: #6b7280;
+}
+
+.kkn-theme-toggle__icon {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  transition: background 160ms ease, color 160ms ease;
+}
+
+.kkn-theme-toggle__icon.is-active {
+  background: #6b7280;
+  color: #ffffff;
+}
+
+.kkn-theme-toggle:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+html[data-theme='light'] .kkn-theme-toggle:hover {
+  background: rgba(255, 255, 255, 1);
+}
+
+.leaflet-control-zoom a {
+  background: rgba(255, 255, 255, 0.92) !important;
+  color: #111827 !important;
+  border: 1px solid rgba(17, 24, 39, 0.18) !important;
+}
+
+.leaflet-control-zoom a:hover {
+  background: rgba(255, 255, 255, 1) !important;
+}
+
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: rgba(13, 17, 23, 0.95) !important;
+  color: #e5e7eb !important;
+  border: 1px solid rgba(31, 41, 55, 0.9);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.45);
+}
+
+.leaflet-popup-content {
+  margin: 10px 12px !important;
+}
+
+.kkn-popup__title {
+  color: #22d3ee;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  margin-bottom: 6px;
+}
+
+.kkn-popup__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.kkn-popup__label {
+  color: #9ca3af;
+}
+
+.kkn-popup__value {
+  color: #e5e7eb;
+}
+
+.kkn-popup__pill {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  border: 1px solid rgba(31, 41, 55, 0.8);
+}
+
+.kkn-pill-high {
+  background: rgba(239, 68, 68, 0.18);
+  color: #fecaca;
+}
+
+.kkn-pill-medium {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fed7aa;
+}
+
+.kkn-pill-low {
+  background: rgba(34, 197, 94, 0.18);
+  color: #bbf7d0;
+}
+
+/* (No visible point markers) */
