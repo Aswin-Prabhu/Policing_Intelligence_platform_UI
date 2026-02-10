@@ -6,7 +6,6 @@ import {
   AlertTriangle,
   FileText,
   FolderOpen,
-  GitBranch,
   BarChart3,
   Target,
   Plane,
@@ -15,7 +14,7 @@ import {
   Users,
   Activity,
   ChevronRight,
-  LogOut
+  ChevronDown
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Clock } from 'lucide-react';
@@ -45,7 +44,11 @@ export function Sidebar({ activeScreen, onNavigate, userRole }: SidebarProps) {
     const saved = localStorage.getItem('kkn_theme');
     return saved === 'dark' ? 'dark' : 'light';
   });
-  const isLightTheme = theme === 'light';
+
+  // State for tracking expanded sections
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(
+    new Set(['Main']) // Default: Main section expanded
+  );
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -139,8 +142,40 @@ export function Sidebar({ activeScreen, onNavigate, userRole }: SidebarProps) {
     return () => clearInterval(timer);
   }, []);
 
+  // Handler for section header click - Accordion behavior (only one section open at a time)
+  const handleSectionClick = (sectionTitle: string, firstItemId: string) => {
+    // Check if this section is already expanded
+    const isCurrentlyExpanded = expandedSections.has(sectionTitle);
 
-  const sidebarClasses = 'w-72 bg-white border-r border-slate-200 flex flex-col h-screen fixed left-0 top-0 z-50 shadow-sm transition-all duration-300';
+    if (isCurrentlyExpanded) {
+      // If clicking on already expanded section, collapse it
+      setExpandedSections(new Set());
+    } else {
+      // Collapse all others and expand only this one (accordion behavior)
+      setExpandedSections(new Set([sectionTitle]));
+      // Defer navigation slightly to allow sidebar animation to start smoothly
+      // This prevents the "stuck" feeling if the target screen is heavy to render
+      setTimeout(() => {
+        onNavigate(firstItemId);
+      }, 10);
+    }
+  };
+
+  // Check if a section is expanded
+  const isSectionExpanded = (sectionTitle: string) => {
+    return expandedSections.has(sectionTitle);
+  };
+
+  // Helper for item navigation with smooth transition
+  const handleItemClick = (itemId: string) => {
+    // Small delay to show ripple/active state before heavy render
+    setTimeout(() => {
+      onNavigate(itemId);
+    }, 10);
+  };
+
+
+  const sidebarClasses = 'w-72 bg-white border-r border-slate-200 flex flex-col h-screen fixed left-0 top-0 z-50 shadow-sm transition-all duration-200';
 
   return (
     <div className={sidebarClasses}>
@@ -148,11 +183,11 @@ export function Sidebar({ activeScreen, onNavigate, userRole }: SidebarProps) {
       <div className="px-6 py-6 border-b border-slate-100 bg-gradient-to-r from-white to-slate-50/50">
 
         <div className="flex items-center gap-3 mb-6">
-          <div className="w-12 h-12 bg-white rounded-xl shadow-sm border border-slate-100 flex items-center justify-center p-1">
+          <div className="w-14 h-14 flex items-center justify-center relative">
             <img
               src={apPoliceLogo}
               alt="AP Police Logo"
-              className="w-full h-full object-contain"
+              className="w-full h-full object-contain filter drop-shadow-[0_4px_3px_rgba(0,0,0,0.4)] drop-shadow-[0_1px_0_rgba(255,255,255,0.5)] contrast-125 hover:scale-105 transition-transform duration-300"
             />
           </div>
           <div>
@@ -181,55 +216,91 @@ export function Sidebar({ activeScreen, onNavigate, userRole }: SidebarProps) {
       </div>
 
       {/* Navigation Area */}
-      <nav className="flex-1 overflow-y-auto py-6 px-4 space-y-6 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
-        {filteredSections.map((section) => (
-          <div key={section.title}>
-            {section.title && (
-              <p className="text-[10px] font-bold text-slate-400 px-4 mb-3 uppercase tracking-widest leading-none">
-                {section.title}
-              </p>
-            )}
-            <div className="space-y-1">
-              {section.items.map((item) => {
-                const Icon = item.icon;
-                const isActive =
-                  item.id === 'anpr-home'
-                    ? activeScreen === 'anpr-home'
-                    : item.id === 'anpr-list'
-                      ? ['anpr-list', 'anpr-detail', 'anpr-approval', 'anpr-operator', 'anpr-supervisor-queue'].includes(activeScreen)
-                      : item.id.startsWith('alerts')
-                        ? activeScreen.startsWith('alerts') || activeScreen.startsWith('incident')
-                        : item.id.startsWith('evidence')
-                          ? activeScreen.startsWith('evidence')
-                          : item.id.startsWith('explainability')
-                            ? activeScreen.startsWith('explainability')
-                            : activeScreen.startsWith(item.id);
+      <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-2 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
+        {filteredSections.map((section) => {
+          const isExpanded = isSectionExpanded(section.title);
+          const firstItemId = section.items[0]?.id || '';
 
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => onNavigate(item.id)}
-                    className={`group w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition-all duration-200 rounded-xl relative overflow-hidden ${isActive
-                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200 translate-x-1'
-                      : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50 hover:translate-x-1'
+          return (
+            <div key={section.title} className="mb-0.5">
+              {section.title && (
+                <button
+                  onClick={() => handleSectionClick(section.title, firstItemId)}
+                  className={`flex items-center justify-between w-full px-3 py-2 mb-0.5 rounded-lg transition-all duration-200 group relative overflow-hidden ${isExpanded
+                    ? 'bg-indigo-600 shadow-md shadow-indigo-900/20'
+                    : 'hover:bg-slate-100/50 border border-transparent hover:border-slate-200'
+                    }`}
+                >
+                  {/* Subtle shine effect on hover */}
+                  <div className={`absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 ${isExpanded ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                    }`}></div>
+
+                  <p className={`text-[11px] font-bold uppercase tracking-wider leading-none transition-all duration-200 relative z-10 ${isExpanded
+                    ? 'text-white'
+                    : 'text-slate-500 group-hover:text-indigo-700'
+                    }`}>
+                    {section.title}
+                  </p>
+                  <ChevronDown
+                    className={`w-4 h-4 transition-all duration-200 relative z-10 ${isExpanded
+                      ? 'rotate-0 text-white'
+                      : '-rotate-90 text-slate-400 group-hover:text-indigo-600'
                       }`}
-                  >
-                    {/* Icon */}
-                    <Icon className={`w-5 h-5 transition-colors duration-200 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-indigo-600'}`} />
+                  />
+                </button>
+              )}
 
-                    {/* Label */}
-                    <span className="flex-1 text-left tracking-tight">{item.label}</span>
+              {/* Collapsible section items */}
+              <div
+                className={`overflow-hidden transition-all duration-200 ease-in-out ${isExpanded ? 'max-h-[1000px] opacity-100 my-1' : 'max-h-0 opacity-0'
+                  }`}
+              >
+                <div className="space-y-0.5 pl-2 pr-1">
+                  {section.items.map((item) => {
+                    const Icon = item.icon;
+                    const isActive =
+                      item.id === 'anpr-home'
+                        ? activeScreen === 'anpr-home'
+                        : item.id === 'anpr-list'
+                          ? ['anpr-list', 'anpr-detail', 'anpr-approval', 'anpr-operator', 'anpr-supervisor-queue'].includes(activeScreen)
+                          : item.id.startsWith('alerts')
+                            ? activeScreen.startsWith('alerts') || activeScreen.startsWith('incident')
+                            : item.id.startsWith('evidence')
+                              ? activeScreen.startsWith('evidence')
+                              : item.id.startsWith('explainability')
+                                ? activeScreen.startsWith('explainability')
+                                : activeScreen.startsWith(item.id);
 
-                    {/* Active Indicator (Chevron) */}
-                    {isActive && (
-                      <ChevronRight className="w-4 h-4 text-indigo-200 animate-in fade-in slide-in-from-left-1" />
-                    )}
-                  </button>
-                );
-              })}
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => handleItemClick(item.id)}
+                        className={`group w-full flex items-center gap-3 px-3 py-2 text-xs font-medium transition-all duration-200 rounded-lg relative overflow-hidden ${isActive
+                          ? 'bg-indigo-50 text-indigo-700 border-l-4 border-indigo-600 shadow-sm'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 border-l-4 border-transparent hover:border-slate-300'
+                          }`}
+                      >
+                        {/* Icon */}
+                        <Icon className={`w-4 h-4 transition-all duration-200 flex-shrink-0 ${isActive
+                          ? 'text-indigo-600'
+                          : 'text-slate-400 group-hover:text-slate-600'
+                          }`} />
+
+                        {/* Label */}
+                        <span className="flex-1 text-left tracking-tight leading-none">{item.label}</span>
+
+                        {/* Active Indicator (Chevron) */}
+                        {isActive && (
+                          <ChevronRight className="w-3 h-3 text-indigo-500 relative z-10 flex-shrink-0" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </nav>
 
       {/* Footer / User Area */}

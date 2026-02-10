@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
     BarChart,
     Bar,
@@ -20,6 +20,19 @@ interface TrafficViolationAnalyticsProps {
 }
 
 export function TrafficViolationAnalytics({ onBack }: TrafficViolationAnalyticsProps) {
+    // Kakinada Zone-Area Mapping
+    const kakinadaZones: { [key: string]: string[] } = {
+        'North Zone': ['All Areas', 'Sarpavaram', 'Turangi', 'Ramanayyapeta', 'Jagannaickpur'],
+        'South Zone': ['All Areas', 'Suryaraopeta', 'Bhanugudi', 'Vakalapudi', 'Sarpavaram Junction'],
+        'East Zone': ['All Areas', 'Beach Road', 'Bhavanapadu', 'Coastal Area', 'Port Area'],
+        'West Zone': ['All Areas', 'Ramaraopeta', 'Danavaipeta', 'Prakash Nagar', 'Auto Nagar'],
+        'Central Zone': ['All Areas', 'Main Road', 'Market Area', 'Railway Station', 'Bus Stand']
+    };
+
+    // Filter State
+    const [selectedZone, setSelectedZone] = useState<string>('All Zones');
+    const [selectedArea, setSelectedArea] = useState<string>('All Areas');
+
     // Mock Data - Matching ANPR Home "87 Analysis" context
     const violationsByType = [
         { name: 'No Helmet', value: 45 },
@@ -51,6 +64,35 @@ export function TrafficViolationAnalytics({ onBack }: TrafficViolationAnalyticsP
         { label: 'Pending Review', value: '13', change: '-2%', color: 'text-slate-700', bg: 'bg-slate-50' },
         { label: 'Accuracy Rate', value: '98.2%', change: '+0.5%', color: 'text-slate-700', bg: 'bg-slate-50' },
     ];
+
+    // High Violation Zones with zone and area data
+    const highViolationZonesAll = [
+        { zone: 'Main Road Junction', count: 42, severity: 'High', zoneArea: 'Central Zone', area: 'Main Road' },
+        { zone: 'Market Square', count: 28, severity: 'Medium', zoneArea: 'Central Zone', area: 'Market Area' },
+        { zone: 'Beach Road Junction', count: 24, severity: 'High', zoneArea: 'East Zone', area: 'Beach Road' },
+        { zone: 'NH-16 Bypass', count: 18, severity: 'Medium', zoneArea: 'West Zone', area: 'Auto Nagar' },
+        { zone: 'Railway Station', count: 15, severity: 'Medium', zoneArea: 'Central Zone', area: 'Railway Station' },
+        { zone: 'Turangi Circle', count: 12, severity: 'Low', zoneArea: 'North Zone', area: 'Turangi' },
+        { zone: 'Port Area Gate', count: 10, severity: 'Low', zoneArea: 'East Zone', area: 'Port Area' },
+        { zone: 'Prakash Nagar', count: 8, severity: 'Low', zoneArea: 'West Zone', area: 'Prakash Nagar' },
+    ];
+
+    // Filter logic for high violation zones
+    const getFilteredViolationZones = () => {
+        let filtered = highViolationZonesAll;
+
+        if (selectedZone !== 'All Zones') {
+            filtered = filtered.filter(item => item.zoneArea === selectedZone);
+        }
+
+        if (selectedArea !== 'All Areas') {
+            filtered = filtered.filter(item => item.area === selectedArea);
+        }
+
+        return filtered;
+    };
+
+    const highViolationZones = getFilteredViolationZones();
 
     // Analytics Dashboard Palette (Slate Scale)
     const analyticsPalette = ['#334155', '#475569', '#64748b', '#94a3b8', '#cbd5e1'];
@@ -175,28 +217,61 @@ export function TrafficViolationAnalytics({ onBack }: TrafficViolationAnalyticsP
 
                 {/* Hotspots List (Professional) */}
                 <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm lg:col-span-2">
-                    <h3 className="text-lg font-bold text-slate-800 mb-6">High Violation Zones (Hotspots)</h3>
-                    <div className="space-y-4">
-                        {[
-                            { zone: 'Main Road Junction', count: 42, severity: 'High' },
-                            { zone: 'Market Square', count: 28, severity: 'Medium' },
-                            { zone: 'School Zone B', count: 12, severity: 'Medium' },
-                            { zone: 'Highway Exit 4', count: 5, severity: 'Low' },
-                        ].map((zone, idx) => (
+                    <h3 className="text-lg font-bold text-slate-800 mb-4">High Violation Zones (Hotspots)</h3>
+
+                    {/* Filter Section */}
+                    <div className="flex gap-3 mb-6">
+                        <div className="flex-1">
+                            <label className="block text-xs font-medium text-slate-600 mb-1.5">Zone</label>
+                            <select
+                                value={selectedZone}
+                                onChange={(e) => {
+                                    setSelectedZone(e.target.value);
+                                    setSelectedArea('All Areas');
+                                }}
+                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-slate-300"
+                            >
+                                <option value="All Zones">All Zones</option>
+                                {Object.keys(kakinadaZones).map(zone => (
+                                    <option key={zone} value={zone}>{zone}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="flex-1">
+                            <label className="block text-xs font-medium text-slate-600 mb-1.5">Area</label>
+                            <select
+                                value={selectedArea}
+                                onChange={(e) => setSelectedArea(e.target.value)}
+                                disabled={selectedZone === 'All Zones'}
+                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:bg-slate-50 disabled:text-slate-400"
+                            >
+                                {selectedZone === 'All Zones' ? (
+                                    <option value="All Areas">All Areas</option>
+                                ) : (
+                                    kakinadaZones[selectedZone]?.map(area => (
+                                        <option key={area} value={area}>{area}</option>
+                                    ))
+                                )}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="space-y-3 max-h-64 overflow-y-auto">
+                        {highViolationZones.map((zoneItem, idx) => (
                             <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
                                 <div className="flex items-center gap-3">
                                     <div className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center font-bold text-slate-500 text-xs">
                                         {idx + 1}
                                     </div>
-                                    <span className="font-medium text-slate-700">{zone.zone}</span>
+                                    <span className="font-medium text-slate-700">{zoneItem.zone}</span>
                                 </div>
                                 <div className="flex items-center gap-4">
-                                    <span className="text-sm text-slate-500">{zone.count} Violations</span>
-                                    <span className={`text-xs font-bold px-2 py-1 rounded-full ${zone.severity === 'High' ? 'bg-rose-100 text-rose-600' :
-                                        zone.severity === 'Medium' ? 'bg-amber-100 text-amber-600' :
+                                    <span className="text-sm text-slate-500">{zoneItem.count} Violations</span>
+                                    <span className={`text-xs font-bold px-2 py-1 rounded-full ${zoneItem.severity === 'High' ? 'bg-rose-100 text-rose-600' :
+                                        zoneItem.severity === 'Medium' ? 'bg-amber-100 text-amber-600' :
                                             'bg-emerald-100 text-emerald-600'
                                         }`}>
-                                        {zone.severity}
+                                        {zoneItem.severity}
                                     </span>
                                 </div>
                             </div>

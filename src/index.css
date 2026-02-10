@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+html {
+  font-size: 110%; /* Increase base size by 10% */
+}
+
 :root {
   /* Default (dark) palette - deep navy with subtle contrast */
   --app-background: #050816;

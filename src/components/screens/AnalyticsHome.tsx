@@ -1,5 +1,6 @@
 import { AlertTriangle, TrendingUp, Activity, BarChart3, MapPin, Target, Sparkles } from 'lucide-react';
 import ReactECharts from 'echarts-for-react';
+import { useState } from 'react';
 
 interface AnalyticsHomeProps {
     userRole: 'operator' | 'supervisor' | 'admin';
@@ -16,6 +17,19 @@ interface AnalyticsHomeProps {
 // Policing-Centric, Risk-Aware Analytics
 // ============================================
 function OperatorAnalytics() {
+    // Kakinada Zone-Area Mapping
+    const kakinadaZones: { [key: string]: string[] } = {
+        'North Zone': ['All Areas', 'Sarpavaram', 'Turangi', 'Ramanayyapeta', 'Jagannaickpur'],
+        'South Zone': ['All Areas', 'Suryaraopeta', 'Bhanugudi', 'Vakalapudi', 'Sarpavaram Junction'],
+        'East Zone': ['All Areas', 'Beach Road', 'Bhavanapadu', 'Coastal Area', 'Port Area'],
+        'West Zone': ['All Areas', 'Ramaraopeta', 'Danavaipeta', 'Prakash Nagar', 'Auto Nagar'],
+        'Central Zone': ['All Areas', 'Main Road', 'Market Area', 'Railway Station', 'Bus Stand']
+    };
+
+    // Filter State
+    const [selectedZone, setSelectedZone] = useState<string>('All Zones');
+    const [selectedArea, setSelectedArea] = useState<string>('All Areas');
+
     const operatorMetrics = {
         activeRiskEvents: 12,
         highSeverityCount: 3,
@@ -53,12 +67,17 @@ function OperatorAnalytics() {
             { location: 'NH-16 Bypass', type: 'Traffic Accident', duration: '15 min', severity: 'Medium' },
             { location: 'Market Square', type: 'Suspicious Activity', duration: '12 min', severity: 'Medium' },
         ],
-        repeatCrimeLocations: [
-            { location: 'Beach Road Junction', count: 47, category: 'Traffic Violations' },
-            { location: 'NH-16 Bypass', count: 38, category: 'Vehicle Theft' },
-            { location: 'Market Square', count: 32, category: 'Public Disturbance' },
-            { location: 'Railway Station', count: 28, category: 'Pickpocketing' },
-            { location: 'Bus Stand Area', count: 24, category: 'Theft' },
+        repeatCrimeLocationsAll: [
+            { location: 'Beach Road Junction', count: 47, category: 'Traffic Violations', zone: 'East Zone', area: 'Beach Road' },
+            { location: 'NH-16 Bypass', count: 38, category: 'Vehicle Theft', zone: 'West Zone', area: 'Auto Nagar' },
+            { location: 'Market Square', count: 32, category: 'Public Disturbance', zone: 'Central Zone', area: 'Market Area' },
+            { location: 'Railway Station', count: 28, category: 'Pickpocketing', zone: 'Central Zone', area: 'Railway Station' },
+            { location: 'Bus Stand Area', count: 24, category: 'Theft', zone: 'Central Zone', area: 'Bus Stand' },
+            { location: 'Sarpavaram Junction', count: 22, category: 'Traffic Violations', zone: 'South Zone', area: 'Sarpavaram Junction' },
+            { location: 'Turangi Circle', count: 20, category: 'Accidents', zone: 'North Zone', area: 'Turangi' },
+            { location: 'Port Area Gate', count: 18, category: 'Suspicious Activity', zone: 'East Zone', area: 'Port Area' },
+            { location: 'Prakash Nagar', count: 16, category: 'Theft', zone: 'West Zone', area: 'Prakash Nagar' },
+            { location: 'Ramanayyapeta', count: 14, category: 'Public Disturbance', zone: 'North Zone', area: 'Ramanayyapeta' },
         ],
         activeIncidentsByZone: [
             { zone: 'North Zone', count: 5, critical: 1 },
@@ -73,6 +92,23 @@ function OperatorAnalytics() {
             affectedIncident: 'INC-2024-0012',
         },
     };
+
+    // Filter logic for repeat crime locations
+    const getFilteredRepeatCrimeLocations = () => {
+        let filtered = operatorMetrics.repeatCrimeLocationsAll;
+
+        if (selectedZone !== 'All Zones') {
+            filtered = filtered.filter(item => item.zone === selectedZone);
+        }
+
+        if (selectedArea !== 'All Areas') {
+            filtered = filtered.filter(item => item.area === selectedArea);
+        }
+
+        return filtered;
+    };
+
+    const repeatCrimeLocations = getFilteredRepeatCrimeLocations();
 
     const gridColor = '#e2e8f0';
     const axisText = '#64748b';
@@ -151,7 +187,7 @@ function OperatorAnalytics() {
         },
         yAxis: {
             type: 'category',
-            data: operatorMetrics.repeatCrimeLocations.map((d) => d.location),
+            data: repeatCrimeLocations.map((d) => d.location),
             axisLine: { lineStyle: { color: gridColor } },
             axisLabel: { color: axisText, fontSize: 11, width: 110, overflow: 'truncate' },
         },
@@ -164,7 +200,7 @@ function OperatorAnalytics() {
         series: [
             {
                 type: 'bar',
-                data: operatorMetrics.repeatCrimeLocations.map((d) => d.count),
+                data: repeatCrimeLocations.map((d) => d.count),
                 itemStyle: { color: '#64748b', borderRadius: [0, 4, 4, 0] },
                 barWidth: 16,
             },
@@ -268,7 +304,45 @@ function OperatorAnalytics() {
                     <ReactECharts option={activeIncidentsByZoneOption} style={{ height: 280 }} />
                 </div>
                 <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-                    <h3 className="font-bold text-slate-800 mb-6">Repeat Crime Locations</h3>
+                    <h3 className="font-bold text-slate-800 mb-4">Repeat Crime Locations</h3>
+
+                    {/* Filter Section */}
+                    <div className="flex gap-4 mb-6">
+                        <div className="flex-1">
+                            <label className="block text-xs font-medium text-slate-600 mb-2">Zone</label>
+                            <select
+                                value={selectedZone}
+                                onChange={(e) => {
+                                    setSelectedZone(e.target.value);
+                                    setSelectedArea('All Areas');
+                                }}
+                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-slate-300"
+                            >
+                                <option value="All Zones">All Zones</option>
+                                {Object.keys(kakinadaZones).map(zone => (
+                                    <option key={zone} value={zone}>{zone}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="flex-1">
+                            <label className="block text-xs font-medium text-slate-600 mb-2">Area</label>
+                            <select
+                                value={selectedArea}
+                                onChange={(e) => setSelectedArea(e.target.value)}
+                                disabled={selectedZone === 'All Zones'}
+                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:bg-slate-50 disabled:text-slate-400"
+                            >
+                                {selectedZone === 'All Zones' ? (
+                                    <option value="All Areas">All Areas</option>
+                                ) : (
+                                    kakinadaZones[selectedZone]?.map(area => (
+                                        <option key={area} value={area}>{area}</option>
+                                    ))
+                                )}
+                            </select>
+                        </div>
+                    </div>
+
                     <ReactECharts option={repeatCrimeLocationsOption} style={{ height: 280 }} />
                 </div>
             </div>
@@ -359,6 +433,19 @@ function OperatorAnalytics() {
 // Police-Focused Operational Metrics
 // ============================================
 function SupervisorAnalytics() {
+    // Kakinada Zone-Area Mapping
+    const kakinadaZones: { [key: string]: string[] } = {
+        'North Zone': ['All Areas', 'Sarpavaram', 'Turangi', 'Ramanayyapeta', 'Jagannaickpur'],
+        'South Zone': ['All Areas', 'Suryaraopeta', 'Bhanugudi', 'Vakalapudi', 'Sarpavaram Junction'],
+        'East Zone': ['All Areas', 'Beach Road', 'Bhavanapadu', 'Coastal Area', 'Port Area'],
+        'West Zone': ['All Areas', 'Ramaraopeta', 'Danavaipeta', 'Prakash Nagar', 'Auto Nagar'],
+        'Central Zone': ['All Areas', 'Main Road', 'Market Area', 'Railway Station', 'Bus Stand']
+    };
+
+    // Filter State
+    const [selectedZone, setSelectedZone] = useState<string>('All Zones');
+    const [selectedArea, setSelectedArea] = useState<string>('All Areas');
+
     const supervisorMetrics = {
         casesPendingReview: 18,
         criticalCasesOpen: 3,
@@ -374,11 +461,15 @@ function SupervisorAnalytics() {
             { name: 'Patrol Team-C', load: 68, cases: 10 },
             { name: 'Patrol Team-D', load: 55, cases: 8 },
         ],
-        crimeHotspots: [
-            { location: 'Beach Road Junction', type: 'New', crimes: 24, category: 'Traffic Violations' },
-            { location: 'NH-16 Bypass', type: 'Persistent', crimes: 18, category: 'Vehicle Theft' },
-            { location: 'Market Square', type: 'New', crimes: 15, category: 'Public Disturbance' },
-            { location: 'Railway Station', type: 'Persistent', crimes: 12, category: 'Pickpocketing' },
+        crimeHotspotsAll: [
+            { location: 'Beach Road Junction', type: 'New', crimes: 24, category: 'Traffic Violations', zone: 'East Zone', area: 'Beach Road' },
+            { location: 'NH-16 Bypass', type: 'Persistent', crimes: 18, category: 'Vehicle Theft', zone: 'West Zone', area: 'Auto Nagar' },
+            { location: 'Market Square', type: 'New', crimes: 15, category: 'Public Disturbance', zone: 'Central Zone', area: 'Market Area' },
+            { location: 'Railway Station', type: 'Persistent', crimes: 12, category: 'Pickpocketing', zone: 'Central Zone', area: 'Railway Station' },
+            { location: 'Port Area Gate', type: 'New', crimes: 11, category: 'Suspicious Activity', zone: 'East Zone', area: 'Port Area' },
+            { location: 'Turangi Circle', type: 'Persistent', crimes: 10, category: 'Accidents', zone: 'North Zone', area: 'Turangi' },
+            { location: 'Prakash Nagar Junction', type: 'New', crimes: 9, category: 'Theft', zone: 'West Zone', area: 'Prakash Nagar' },
+            { location: 'Sarpavaram Junction', type: 'Persistent', crimes: 8, category: 'Traffic Violations', zone: 'South Zone', area: 'Sarpavaram Junction' },
         ],
         responseTimeByShift: [
             { shift: 'Morning (6AM-2PM)', time: '3.8 min', cases: 18 },
@@ -400,6 +491,23 @@ function SupervisorAnalytics() {
         ],
         weekOverWeekDelta: '+8%',
     };
+
+    // Filter logic for crime hotspots
+    const getFilteredCrimeHotspots = () => {
+        let filtered = supervisorMetrics.crimeHotspotsAll;
+
+        if (selectedZone !== 'All Zones') {
+            filtered = filtered.filter(item => item.zone === selectedZone);
+        }
+
+        if (selectedArea !== 'All Areas') {
+            filtered = filtered.filter(item => item.area === selectedArea);
+        }
+
+        return filtered;
+    };
+
+    const crimeHotspots = getFilteredCrimeHotspots();
 
     const gridColor = '#e2e8f0';
     const axisText = '#64748b';
@@ -569,27 +677,70 @@ function SupervisorAnalytics() {
                 </div>
 
                 <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-                    <h3 className="font-bold text-slate-800 mb-6">Crime Hotspots (7 Days)</h3>
-                    <div className="space-y-3">
-                        {supervisorMetrics.crimeHotspots.map((hotspot, idx) => (
-                            <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-lg hover:border-gray-200 transition-colors">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-white rounded-full border border-gray-200">
-                                        <MapPin className="w-4 h-4 text-slate-500" />
+                    <h3 className="font-bold text-slate-800 mb-4">Crime Hotspots (7 Days)</h3>
+
+                    {/* Filter Section */}
+                    <div className="flex gap-4 mb-6">
+                        <div className="flex-1">
+                            <label className="block text-xs font-medium text-slate-600 mb-2">Zone</label>
+                            <select
+                                value={selectedZone}
+                                onChange={(e) => {
+                                    setSelectedZone(e.target.value);
+                                    setSelectedArea('All Areas');
+                                }}
+                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-slate-300"
+                            >
+                                <option value="All Zones">All Zones</option>
+                                {Object.keys(kakinadaZones).map(zone => (
+                                    <option key={zone} value={zone}>{zone}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="flex-1">
+                            <label className="block text-xs font-medium text-slate-600 mb-2">Area</label>
+                            <select
+                                value={selectedArea}
+                                onChange={(e) => setSelectedArea(e.target.value)}
+                                disabled={selectedZone === 'All Zones'}
+                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:bg-slate-50 disabled:text-slate-400"
+                            >
+                                {selectedZone === 'All Zones' ? (
+                                    <option value="All Areas">All Areas</option>
+                                ) : (
+                                    kakinadaZones[selectedZone]?.map(area => (
+                                        <option key={area} value={area}>{area}</option>
+                                    ))
+                                )}
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* Scrollable list with fade effect */}
+                    <div className="relative">
+                        <div className="space-y-3 max-h-80 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-slate-100">
+                            {crimeHotspots.map((hotspot, idx) => (
+                                <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-lg hover:border-gray-200 transition-colors">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 bg-white rounded-full border border-gray-200">
+                                            <MapPin className="w-4 h-4 text-slate-500" />
+                                        </div>
+                                        <div>
+                                            <div className="font-bold text-slate-700">{hotspot.location}</div>
+                                            <div className="text-xs text-slate-500">{hotspot.crimes} crimes • {hotspot.category}</div>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <div className="font-bold text-slate-700">{hotspot.location}</div>
-                                        <div className="text-xs text-slate-500">{hotspot.crimes} crimes • {hotspot.category}</div>
-                                    </div>
+                                    <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${hotspot.type === 'New'
+                                        ? 'bg-indigo-100 text-indigo-700'
+                                        : 'bg-amber-100 text-amber-700'
+                                        }`}>
+                                        {hotspot.type}
+                                    </span>
                                 </div>
-                                <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${hotspot.type === 'New'
-                                    ? 'bg-indigo-100 text-indigo-700'
-                                    : 'bg-amber-100 text-amber-700'
-                                    }`}>
-                                    {hotspot.type}
-                                </span>
-                            </div>
-                        ))}
+                            ))}
+                        </div>
+                        {/* Fade gradient at bottom */}
+                        <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-white to-transparent pointer-events-none"></div>
                     </div>
                 </div>
             </div>
@@ -689,6 +840,19 @@ function SupervisorAnalytics() {
 // ADMIN ANALYTICS - System-Wide Overview
 // ============================================
 function AdminAnalytics() {
+    // Kakinada Zone-Area Mapping
+    const kakinadaZones: { [key: string]: string[] } = {
+        'North Zone': ['All Areas', 'Sarpavaram', 'Turangi', 'Ramanayyapeta', 'Jagannaickpur'],
+        'South Zone': ['All Areas', 'Suryaraopeta', 'Bhanugudi', 'Vakalapudi', 'Sarpavaram Junction'],
+        'East Zone': ['All Areas', 'Beach Road', 'Bhavanapadu', 'Coastal Area', 'Port Area'],
+        'West Zone': ['All Areas', 'Ramaraopeta', 'Danavaipeta', 'Prakash Nagar', 'Auto Nagar'],
+        'Central Zone': ['All Areas', 'Main Road', 'Market Area', 'Railway Station', 'Bus Stand']
+    };
+
+    // Filter State
+    const [selectedZone, setSelectedZone] = useState<string>('All Zones');
+    const [selectedArea, setSelectedArea] = useState<string>('All Areas');
+
     const gridColor = '#e2e8f0';
     const axisText = '#64748b';
     const tooltipBg = 'rgba(255, 255, 255, 0.95)';
@@ -707,13 +871,34 @@ function AdminAnalytics() {
     ];
 
     // Geographic Distribution Data
-    const locationData = [
-        { location: 'NH-16 Junction', total: 142 },
-        { location: 'Beach Road', total: 118 },
-        { location: 'Market Square', total: 95 },
-        { location: 'Railway Station', total: 87 },
-        { location: 'Port Area', total: 73 },
+    const locationDataAll = [
+        { location: 'NH-16 Junction', total: 142, zone: 'West Zone', area: 'Auto Nagar' },
+        { location: 'Beach Road', total: 118, zone: 'East Zone', area: 'Beach Road' },
+        { location: 'Market Square', total: 95, zone: 'Central Zone', area: 'Market Area' },
+        { location: 'Railway Station', total: 87, zone: 'Central Zone', area: 'Railway Station' },
+        { location: 'Port Area', total: 73, zone: 'East Zone', area: 'Port Area' },
+        { location: 'Turangi Circle', total: 68, zone: 'North Zone', area: 'Turangi' },
+        { location: 'Prakash Nagar', total: 62, zone: 'West Zone', area: 'Prakash Nagar' },
+        { location: 'Sarpavaram Junction', total: 55, zone: 'South Zone', area: 'Sarpavaram Junction' },
+        { location: 'Bus Stand', total: 48, zone: 'Central Zone', area: 'Bus Stand' },
     ];
+
+    // Filter logic for geographic distribution
+    const getFilteredLocationData = () => {
+        let filtered = locationDataAll;
+
+        if (selectedZone !== 'All Zones') {
+            filtered = filtered.filter(item => item.zone === selectedZone);
+        }
+
+        if (selectedArea !== 'All Areas') {
+            filtered = filtered.filter(item => item.area === selectedArea);
+        }
+
+        return filtered;
+    };
+
+    const locationData = getFilteredLocationData();
 
     const activityTimelineOption = {
         grid: { left: 50, right: 20, top: 40, bottom: 30 },
@@ -870,6 +1055,44 @@ function AdminAnalytics() {
                 </div>
                 <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
                     <h3 className="font-bold text-slate-800 mb-4">Geographic Distribution</h3>
+
+                    {/* Filter Section */}
+                    <div className="flex gap-4 mb-6">
+                        <div className="flex-1">
+                            <label className="block text-xs font-medium text-slate-600 mb-2">Zone</label>
+                            <select
+                                value={selectedZone}
+                                onChange={(e) => {
+                                    setSelectedZone(e.target.value);
+                                    setSelectedArea('All Areas');
+                                }}
+                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-slate-300"
+                            >
+                                <option value="All Zones">All Zones</option>
+                                {Object.keys(kakinadaZones).map(zone => (
+                                    <option key={zone} value={zone}>{zone}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="flex-1">
+                            <label className="block text-xs font-medium text-slate-600 mb-2">Area</label>
+                            <select
+                                value={selectedArea}
+                                onChange={(e) => setSelectedArea(e.target.value)}
+                                disabled={selectedZone === 'All Zones'}
+                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:bg-slate-50 disabled:text-slate-400"
+                            >
+                                {selectedZone === 'All Zones' ? (
+                                    <option value="All Areas">All Areas</option>
+                                ) : (
+                                    kakinadaZones[selectedZone]?.map(area => (
+                                        <option key={area} value={area}>{area}</option>
+                                    ))
+                                )}
+                            </select>
+                        </div>
+                    </div>
+
                     <ReactECharts option={geographicOption} style={{ height: '280px' }} />
                 </div>
             </div>
