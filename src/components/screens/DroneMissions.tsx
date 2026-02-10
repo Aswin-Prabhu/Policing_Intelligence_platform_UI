@@ -154,12 +154,12 @@ function MissionCard({ mission, videoSource, getStatusColor, getBatteryColor }: 
         {/* Right: Map & AI Detections */}
         <div className="col-span-1 space-y-3">
           {/* GPS Map */}
-          <div className="bg-black aspect-square rounded-lg border border-gray-300 relative overflow-hidden">
-            <DroneMap 
-              lat={mission.gps.lat} 
-              lng={mission.gps.lng} 
+          <div className="bg-black aspect-square rounded-lg border border-gray-300 relative overflow-hidden z-0">
+            <DroneMap
+              lat={mission.gps.lat}
+              lng={mission.gps.lng}
               radius={600}
-              className="absolute inset-0"
+              className="absolute inset-0 z-0"
             />
             <div className="absolute top-2 left-2 z-[1000] text-xs text-white bg-white/90 px-2 py-1 rounded font-medium">
               GPS: {mission.gps.lat.toFixed(4)}, {mission.gps.lng.toFixed(4)}

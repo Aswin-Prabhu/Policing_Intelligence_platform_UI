@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { LoginPage } from './components/LoginPage';
 import { Sidebar } from './components/Sidebar';
 import { TopBar } from './components/TopBar';
+import { LoadingScreen } from './components/LoadingScreen';
 
 // screens…
 import { Dashboard } from './components/screens/Dashboard';
@@ -147,13 +148,25 @@ export default function App() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const [user, setUser] = useState<UserSession | null>(null);
+  const [user, setUser] = useState<UserSession | null>(() => {
+    const saved = localStorage.getItem('kkn_user_session');
+    return saved ? JSON.parse(saved) : null;
+  });
   const [activeScreen, setActiveScreen] = useState<string>(
     pathToScreen[location.pathname] ?? 'dashboard'
   );
   const [gridSize, setGridSize] = useState<'2x2' | '3x3' | '4x4'>('4x4');
   const [selectedCamera, setSelectedCamera] = useState<Camera | null>(null);
   const [selectedViolation, setSelectedViolation] = useState<any | null>(null);
+  const [isLoading, setIsLoading] = useState(true); // Start true for initial load
+
+  // Initial load simulation
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 800); // slightly longer for initial app load
+    return () => clearTimeout(timer);
+  }, []);
 
   // Keep activeScreen in sync when the URL changes (e.g. direct navigation)
   useEffect(() => {
@@ -166,7 +179,9 @@ export default function App() {
   const navigateScreen = useCallback(
     (screen: string) => {
       // avoid redundant state updates (helps reduce jank)
-      if (screen !== activeScreen) setActiveScreen(screen);
+      if (screen !== activeScreen) {
+        setActiveScreen(screen);
+      }
 
       const path = screenToPath[screen];
       if (path && path !== location.pathname) {
@@ -179,12 +194,29 @@ export default function App() {
   // handle login from LoginPage
   const handleLogin = (userData: { role: string; username: string; name: string }) => {
     // Convert LoginPage user data to UserSession (generate an id)
-    setUser({
+    const newUser: UserSession = {
       id: userData.username, // Use username as id for now
       username: userData.username,
       name: userData.name,
       role: userData.role as 'operator' | 'supervisor' | 'admin',
-    });
+    };
+
+    // Show loading before setting user to enable transition
+    setIsLoading(true);
+
+    setTimeout(() => {
+      setUser(newUser);
+      localStorage.setItem('kkn_user_session', JSON.stringify(newUser));
+      // Loading will be handled by the screen navigation logic or remain true briefly
+      // But since we are mounting the authenticated layout for the first time, 
+      // the initial useEffect in App might not run again for this state change.
+      // So we keep it true and let the layout rendering take over, 
+      // but actually we need to clear it after user is set.
+
+      setTimeout(() => {
+        setIsLoading(false);
+      }, 800);
+    }, 500); // Fake network delay for login
   };
 
   // render screens
@@ -471,6 +503,7 @@ export default function App() {
 
   return (
     <div className="flex h-screen bg-background text-white overflow-hidden">
+      {isLoading && <LoadingScreen />}
       <Sidebar
         activeScreen={activeScreen}
         onNavigate={navigateScreen}
@@ -487,10 +520,13 @@ export default function App() {
           username={user.username}
           name={user.name}
           userId={user.id}
-          onLogout={() => setUser(null)}
+          onLogout={() => {
+            setUser(null);
+            localStorage.removeItem('kkn_user_session');
+          }}
         />
 
-        <main className="flex-1 overflow-auto">
+        <main className="flex-1 overflow-auto relative">
           {renderScreen()}
         </main>
       </div>

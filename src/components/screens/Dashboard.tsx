@@ -400,7 +400,7 @@ export function Dashboard({ userRole }: DashboardProps) {
           icon={AlertTriangle}
           status="danger"
         /> */}
-         <MetricCard
+        <MetricCard
           label="Traffic Violations"
           value="87"
           icon={Car}
@@ -452,11 +452,11 @@ export function Dashboard({ userRole }: DashboardProps) {
               </button>
             </div>
           </div>
-          <div className="relative bg-[#0a0e1a] h-[500px]">
+          <div className="relative bg-[#0a0e1a] h-[500px] z-0">
             <LeafletHeatmap
               points={filteredHeatPoints}
               onPointHover={(p) => setHoveredPoint(p)}
-              className="absolute inset-0"
+              className="absolute inset-0 z-0"
             />
 
             {/* Loading / error overlay (map stays visible) */}
