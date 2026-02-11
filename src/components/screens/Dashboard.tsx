@@ -13,30 +13,49 @@ interface DashboardProps {
   userRole: 'operator' | 'supervisor' | 'admin';
 }
 
+interface CameraStatus {
+  zone: string;
+  online_count: number;
+  offline_count: number;
+  degraded_count: number;
+}
+
+interface RecentEvent {
+  id: string;
+  type: string;
+  desc: string;
+  time: string;
+  icon: any;
+}
+
+interface AnomalyAlert {
+  id: string;
+  type: string;
+  severity: 'high' | 'medium' | 'low';
+  camera: string;
+  time: string;
+  confidence: number;
+}
+
 export function Dashboard({ userRole }: DashboardProps) {
   const navigate = useNavigate();
-  const alerts = [
-    { id: 1, type: 'Intrusion', camera: 'CAM-NZ-042', confidence: 94, time: '2 min ago', severity: 'high' },
-    { id: 2, type: 'Crowd Detected', camera: 'CAM-SZ-018', confidence: 87, time: '5 min ago', severity: 'medium' },
-    { id: 3, type: 'Vehicle Loitering', camera: 'CAM-EZ-031', confidence: 91, time: '8 min ago', severity: 'medium' },
-    { id: 4, type: 'Abandoned Object', camera: 'CAM-CZ-007', confidence: 88, time: '12 min ago', severity: 'high' },
-    { id: 5, type: 'Perimeter Breach', camera: 'CAM-WZ-055', confidence: 96, time: '15 min ago', severity: 'high' },
+  // Static alerts for demo (fallback)
+  const staticAlerts = [
+    { id: '1', type: 'Intrusion', camera: 'CAM-NZ-042', confidence: 94, time: '2 min ago', severity: 'high' },
+    { id: '2', type: 'Crowd Detected', camera: 'CAM-SZ-018', confidence: 87, time: '5 min ago', severity: 'medium' },
+    { id: '3', type: 'Vehicle Loitering', camera: 'CAM-EZ-031', confidence: 91, time: '8 min ago', severity: 'medium' },
+    { id: '4', type: 'Abandoned Object', camera: 'CAM-CZ-007', confidence: 88, time: '12 min ago', severity: 'high' },
+    { id: '5', type: 'Perimeter Breach', camera: 'CAM-WZ-055', confidence: 96, time: '15 min ago', severity: 'high' },
   ];
 
+  /* 
   const events = [
     { id: 1, type: 'Incident Created', desc: 'Traffic accident - NH-16', time: '10:23 AM', icon: AlertCircle },
     { id: 2, type: 'Evidence Added', desc: 'CAM-042 snapshot tagged', time: '10:18 AM', icon: Camera },
     { id: 3, type: 'ANPR Match', desc: 'Stolen vehicle detected', time: '10:12 AM', icon: Car },
     { id: 4, type: 'SOP Deviation', desc: 'Officer patrol delay', time: '10:05 AM', icon: FileX },
-  ];
-
-  // const cameraStatus = [
-  //   { zone: 'North Zone', total: 48, online: 45, offline: 2, degraded: 1 },
-  //   { zone: 'South Zone', total: 52, online: 50, offline: 1, degraded: 1 },
-  //   { zone: 'East Zone', total: 38, online: 36, offline: 2, degraded: 0 },
-  //   { zone: 'West Zone', total: 44, online: 42, offline: 1, degraded: 1 },
-  //   { zone: 'Central Zone', total: 36, online: 35, offline: 0, degraded: 1 },
-  // ];
+  ]; 
+  */
 
   const [offlineCameras, setOfflineCameras] = useState(0);
   const token = "eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICI3Ny1NUVdFRTNHZE5adGlsWU5IYmpsa2dVSkpaWUJWVmN1UmFZdHl5ejFjIn0.eyJleHAiOjE3MjYxODIzMzEsImlhdCI6MTcyNjE0NjMzMSwianRpIjoiOGVlZTU1MDctNGVlOC00NjE1LTg3OWUtNTVkMjViMjQ2MGFmIiwiaXNzIjoiaHR0cDovL2tleWNsb2FrLmtleWNsb2FrLnN2Yy5jbHVzdGVyLmxvY2FsOjgwODAvcmVhbG1zL21hc3RlciIsImF1ZCI6ImFjY291bnQiLCJzdWIiOiJmNzFmMzU5My1hNjdhLTQwYmMtYTExYS05YTQ0NjY4YjQxMGQiLCJ0eXAiOiJCZWFyZXIiLCJhenAiOiJIT0xBQ1JBQ1kiLCJzZXNzaW9uX3N0YXRlIjoiYmI1ZjJkMzktYTQ3ZC00MjI0LWFjZGMtZTdmNzQwNDc2OTgwIiwibmFtZSI6ImtzYW14cCBrc2FteHAiLCJnaXZlbl9uYW1lIjoia3NhbXhwIiwiZmFtaWx5X25hbWUiOiJrc2FteHAiLCJwcmVmZXJyZWRfdXNlcm5hbWUiOiJwYXNzd29yZF90ZW5hbnRfa3NhbXhwQG1vYml1c2R0YWFzLmFpIiwiZW1haWwiOiJwYXNzd29yZF90ZW5hbnRfa3NhbXhwQG1vYml1c2R0YWFzLmFpIiwiZW1haWxfdmVyaWZpZWQiOnRydWUsImFjciI6IjEiLCJhbGxvd2VkLW9yaWdpbnMiOlsiLyoiXSwicmVhbG1fYWNjZXNzIjp7InJvbGVzIjpbImRlZmF1bHQtcm9sZXMtbWFzdGVyIiwib2ZmbGluZV9hY2Nlc3MiLCJ1bWFfYXV0aG9yaXphdGlvbiJdfSwicmVzb3VyY2VfYWNjZXNzIjp7IkhPTEFDUkFDWSI6eyJyb2xlcyI6WyJIT0xBQ1JBQ1lfVVNFUiJdfSwiYWNjb3VudCI6eyJyb2xlcyI6WyJtYW5hZ2UtYWNjb3VudCIsIm1hbmFnZS1hY2NvdW50LWxpbmtzIiwidmlldy1wcm9maWxlIl19fSwic2NvcGUiOiJwcm9maWxlIGVtYWlsIiwic2lkIjoiYmI1ZjJkMzktYTQ3ZC00MjI0LWFjZGMtZTdmNzQwNDc2OTgwIiwidGVuYW50SWQiOiJmNzFmMzU5My1hNjdhLTQwYmMtYTExYS05YTQ0NjY4YjQxMGQiLCJyZXF1ZXN0ZXJUeXBlIjoiVEVOQU5UIn0=.FXeDyHBhlG9L4_NCeSyHEaNEBVmhFpfSBqlcbhHaPaoydhKcA0BfuyHgxg_32kQk6z5S9IQ7nVKS2ybtOvwo0WyLWwLQchSq7Noa7LooHIMzmeWMQb_bLKtbaOti59zwIdS8CkfGaXut7RUQKISQVWmbUGsVJQa2JkG6Ng_QN0y5hFVksMWPZiXVsofQkJXHXV1CQ3gabhhHKo3BqlJwzpsCKLDfg1-4PmSl1Wqbw03Ef2yolroj5i8FoeHukOQPkwCUHrrNw-ilIp917nqZa89YbCMtDjWyaj8pEH7GJR5vMZPE2WcJPn5dSA1IHVunfatEB1cDAitaFjVNWNnddQ";
@@ -164,7 +183,7 @@ export function Dashboard({ userRole }: DashboardProps) {
 
 
 
-  const [recentEvents, setRecentEvents] = useState([]);
+  const [recentEvents, setRecentEvents] = useState<RecentEvent[]>([]);
   useEffect(() => {
     async function fetchRecentEvents() {
       try {
@@ -187,7 +206,7 @@ export function Dashboard({ userRole }: DashboardProps) {
         const data = await response.json();
         const list = data?.data || [];
 
-        const formatted = list.map((item) => ({
+        const formatted = list.map((item: any) => ({
           id: item.event_id,
           type: item.event_type,
           desc: `Camera ID: ${item.camera_id}`,
@@ -207,7 +226,7 @@ export function Dashboard({ userRole }: DashboardProps) {
 
 
 
-  const [cameraStatus, setCameraStatus] = useState([]);
+  const [cameraStatus, setCameraStatus] = useState<CameraStatus[]>([]);
 
   useEffect(() => {
     async function fetchCameraStatus() {
@@ -243,7 +262,7 @@ export function Dashboard({ userRole }: DashboardProps) {
 
 
 
-  const [Alerts, setAlerts] = useState([]);
+  const [anomalyAlerts, setAnomalyAlerts] = useState<AnomalyAlert[]>([]);
   useEffect(() => {
     async function fetchAnomalyAlerts() {
       try {
@@ -266,7 +285,7 @@ export function Dashboard({ userRole }: DashboardProps) {
         const data = await response.json();
         const raw = data?.data || [];
 
-        const formatted = raw.map((item) => ({
+        const formatted = raw.map((item: any) => ({
           id: item.event_id,
           type: item.anomaly_type,
           severity:
@@ -280,7 +299,7 @@ export function Dashboard({ userRole }: DashboardProps) {
           confidence: item.confidence ? Number(item.confidence) : 0,
         }));
 
-        setAlerts(formatted);
+        setAnomalyAlerts(formatted);
 
       } catch (err) {
         console.error("API Error (Anomaly Alerts):", err);
@@ -321,7 +340,7 @@ export function Dashboard({ userRole }: DashboardProps) {
                   View Camera Grid
                 </button>
                 <button className="px-4 py-2 bg-orange-500/20 text-orange-400 rounded hover:bg-orange-500/30 text-sm">
-                  Active Alerts ({alerts.length})
+                  Active Alerts ({anomalyAlerts.length})
                 </button>
               </>
             )}
@@ -542,7 +561,7 @@ export function Dashboard({ userRole }: DashboardProps) {
             </h3>
           </div>
           <div className="overflow-y-auto max-h-[500px]">
-            {alerts.map((alert) => (
+            {anomalyAlerts.map((alert) => (
               <div
                 key={alert.id}
                 className="p-4 border-b border-[#1f2937] hover:bg-white/5 cursor-pointer transition-colors"

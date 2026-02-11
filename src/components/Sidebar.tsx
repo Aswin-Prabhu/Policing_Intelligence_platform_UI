@@ -1,5 +1,6 @@
 import {
   LayoutDashboard,
+  BrainCircuit,
   Camera,
   Video,
   Car,
@@ -10,6 +11,7 @@ import {
   Target,
   Plane,
   Radio,
+  Siren,
 
   Users,
   Activity,
@@ -90,7 +92,8 @@ export function Sidebar({ activeScreen, onNavigate, userRole }: SidebarProps) {
     {
       title: 'Incidents Management',
       items: [
-        { id: 'alerts-home', label: 'Incident Management', icon: AlertTriangle, roles: ['operator', 'supervisor', 'admin'] }
+        { id: 'alerts-home', label: 'Incident Management', icon: AlertTriangle, roles: ['operator', 'supervisor', 'admin'] },
+        { id: 'incident-analysis', label: 'AI Incident Analysis', icon: BrainCircuit, roles: ['operator', 'supervisor', 'admin'] }
       ]
     },
     {
@@ -105,6 +108,7 @@ export function Sidebar({ activeScreen, onNavigate, userRole }: SidebarProps) {
       title: 'Evidence Console',
       items: [
         { id: 'evidence-home', label: 'Evidence', icon: FolderOpen, roles: ['operator', 'supervisor', 'admin'] },
+        { id: 'traffic-evidence', label: 'Traffic Snapshots', icon: Car, roles: ['operator', 'supervisor', 'admin'] },
       ]
     },
     {

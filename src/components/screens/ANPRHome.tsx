@@ -136,7 +136,7 @@ export function ANPRHome({ onNavigate, userRole }: ANPRHomeProps) {
           })}
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 gap-4">
           {quickActions.map((action) => {
             const Icon = action.icon;
             return (
@@ -156,18 +156,6 @@ export function ANPRHome({ onNavigate, userRole }: ANPRHomeProps) {
               </button>
             );
           })}
-
-          <button
-            onClick={() => onNavigate('anpr-list')}
-            className="bg-card rounded-xl p-6 card-shadow hover-elevate smooth-transition text-left"
-          >
-            <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-500/20 to-blue-600/20 flex items-center justify-center mb-4">
-              <Car className="h-6 w-6 text-blue-500" />
-            </div>
-            <h3 className="font-semibold">All Detections</h3>
-            <p className="text-sm text-muted-foreground mt-1">View complete ANPR feed</p>
-            <p className="text-xs text-muted-foreground mt-3"></p>
-          </button>
 
           <button
             onClick={() => onNavigate('traffic-analytics')}

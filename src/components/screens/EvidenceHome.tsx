@@ -34,6 +34,15 @@ export function EvidenceHome({ onNavigate, userRole }: EvidenceHomeProps) {
       gradient: 'from-yellow-500/20 to-yellow-600/20',
       supervisorOnly: true,
     },
+    {
+      id: 'traffic-evidence',
+      title: 'Traffic Snapshots',
+      description: 'Violation archive & reports',
+      icon: Film,
+      count: '7-Day Retention',
+      gradient: 'from-rose-500/20 to-rose-600/20',
+      supervisorOnly: false,
+    },
   ];
 
   const filteredModules = modules.filter((m) => !m.supervisorOnly || userRole !== 'operator');

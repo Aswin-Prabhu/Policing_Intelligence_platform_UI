@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { LoginPage } from './components/LoginPage';
 import { Sidebar } from './components/Sidebar';
 import { TopBar } from './components/TopBar';
+import { IncidentAnalysis } from './components/screens/IncidentAnalysis';
 import { LoadingScreen } from './components/LoadingScreen';
 
 // screens…
@@ -23,6 +24,8 @@ import { AlertsHome } from './components/screens/AlertsHome';
 import { AlertsOperator } from './components/screens/AlertsOperator';
 import { AlertsSupervisor } from './components/screens/AlertsSupervisor';
 import { AlertsAdmin } from './components/screens/AlertsAdmin';
+import { AlertDetail } from './components/screens/AlertDetail';
+import { TrafficEvidence } from './components/screens/TrafficEvidence';
 import { SOPCompliance } from './components/screens/SOPCompliance';
 import { IncidentsList } from './components/screens/IncidentsList';
 import { AllIncidents } from './components/screens/AllIncidents';
@@ -317,6 +320,9 @@ export default function App() {
           />
         );
 
+      case 'traffic-evidence':
+        return <TrafficEvidence />;
+
       case 'alerts-supervisor':
         return (
           <AlertsSupervisor
@@ -326,6 +332,12 @@ export default function App() {
           />
         );
 
+      case 'alerts-detail':
+        return <AlertDetail onBack={() => navigateScreen('alerts-home')} />;
+      case 'incident-analysis':
+        return <IncidentAnalysis />;
+
+      // Administrative Screens
       case 'alerts-admin':
         return <AlertsAdmin onBack={() => navigateScreen('alerts-home')} />;
 
