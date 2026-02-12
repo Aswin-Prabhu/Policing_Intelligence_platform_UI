@@ -3,7 +3,8 @@
 @tailwind utilities;
 
 html {
-  font-size: 110%; /* Increase base size by 10% */
+  font-size: 120%;
+  /* Increase base size by 10% */
 }
 
 :root {
@@ -18,10 +19,14 @@ html {
 
 html[data-theme='light'] {
   /* Modern light palette: warm-neutral with a soft blue accent */
-  --app-background: #f5f7fb;       /* page background */
-  --card-background: #ffffff;      /* primary cards / containers */
-  --secondary-background: #f9fafb; /* subtle sections / side panels */
-  --accent-background: #e3edff;    /* headers, search, light accent */
+  --app-background: #f5f7fb;
+  /* page background */
+  --card-background: #ffffff;
+  /* primary cards / containers */
+  --secondary-background: #f9fafb;
+  /* subtle sections / side panels */
+  --accent-background: #e3edff;
+  /* headers, search, light accent */
   --muted-foreground: #4b5563;
   --border-color: #e1e5ef;
 }
