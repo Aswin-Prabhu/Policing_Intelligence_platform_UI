@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 html {
-  font-size: 120%;
+  font-size: 100%;
   /* Increase base size by 10% */
 }
 
