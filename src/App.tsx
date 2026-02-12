@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { logSessionStart, logSessionEnd } from './services/sessionService';
 import { LoginPage } from './components/LoginPage';
 import { Sidebar } from './components/Sidebar';
 import { TopBar } from './components/TopBar';
@@ -61,6 +62,7 @@ import { DroneRegistry } from './components/screens/DroneRegistry';
 import { BodycamRegistry } from './components/screens/BodycamRegistry';
 import { SystemHealth } from './components/screens/SystemHealth';
 import { AIModelManager } from './components/screens/AIModelManager';
+import { SessionHistoryFull } from './components/screens/SessionHistoryFull';
 
 // Map URL paths to internal screen ids
 const pathToScreen: Record<string, string> = {
@@ -127,7 +129,8 @@ const pathToScreen: Record<string, string> = {
   '/drone/missions': 'drone-missions',
   '/drone/alerts': 'drone-alerts',
 
-  '/multi-grid': 'multi-grid-viewer'
+  '/multi-grid': 'multi-grid-viewer',
+  '/session-history': 'session-history-full'
 };
 
 // Reverse mapping: screen id → path (used when navigating from inside the app)
@@ -206,6 +209,12 @@ export default function App() {
 
     // Show loading before setting user to enable transition
     setIsLoading(true);
+
+    try {
+      logSessionStart(newUser.id);
+    } catch (e) {
+      console.error("Session logging failed", e);
+    }
 
     setTimeout(() => {
       setUser(newUser);
@@ -503,6 +512,9 @@ export default function App() {
       case 'multi-grid-viewer':
         return <MultiGrid size={gridSize} />;
 
+      case 'session-history-full':
+        return <SessionHistoryFull onBack={() => navigateScreen('dashboard')} userId={user!.id} />;
+
       default:
         return <Dashboard userRole={user!.role} />;
     }
@@ -533,6 +545,7 @@ export default function App() {
           name={user.name}
           userId={user.id}
           onLogout={() => {
+            if (user) logSessionEnd(user.id);
             setUser(null);
             localStorage.removeItem('kkn_user_session');
           }}

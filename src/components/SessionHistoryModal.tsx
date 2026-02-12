@@ -1,90 +1,34 @@
-import { X, Smartphone, Globe, Clock, LogOut, CheckCircle2 } from "lucide-react";
+import { X, Smartphone, Globe, Clock, LogOut, LayoutGrid } from "lucide-react";
 import { useEffect, useState } from "react";
+import { getSessionHistory, SessionLog } from "../services/sessionService";
+import { IPDisplay } from "./IPDisplay";
 
 interface Props {
   role: string;
   userId: string;
   username: string;
   onClose: () => void;
+  onViewFullHistory: () => void;
 }
 
-interface SessionEntry {
-  loginTime: string;
-  logoutTime: string | 'Active';
-  ip: string;
-  device: string;
-  status: 'active' | 'completed';
-}
-
-export default function SessionHistoryModal({ role, userId, onClose }: Props) {
-  const [history, setHistory] = useState<SessionEntry[]>([]);
+export default function SessionHistoryModal({ userId, onClose, onViewFullHistory }: Props) {
+  const [history, setHistory] = useState<SessionLog[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchSessionData() {
+    async function load() {
       setLoading(true);
-
       try {
-        // 1. Get Real IP
-        let ip = "192.168.1.1";
-        try {
-          const res = await fetch('https://api.ipify.org?format=json');
-          const data = await res.json();
-          ip = data.ip;
-        } catch (e) {
-          console.error("Failed to fetch IP:", e);
-          ip = "Unavailable (Network Error)";
-        }
-
-        // 2. Get Real Device Info
-        const userAgent = navigator.userAgent;
-        let device = "Unknown Device";
-        if (userAgent.indexOf("Win") !== -1) device = "Windows PC";
-        if (userAgent.indexOf("Mac") !== -1) device = "Macintosh";
-        if (userAgent.indexOf("Linux") !== -1) device = "Linux PC";
-        if (userAgent.indexOf("Android") !== -1) device = "Android Device";
-        if (userAgent.indexOf("like Mac") !== -1) device = "iOS Device";
-
-        let browser = "Unknown Browser";
-        if (userAgent.indexOf("Chrome") !== -1) browser = "Chrome";
-        else if (userAgent.indexOf("Firefox") !== -1) browser = "Firefox";
-        else if (userAgent.indexOf("Safari") !== -1) browser = "Safari";
-        else if (userAgent.indexOf("Edge") !== -1) browser = "Edge";
-
-        const fullDevice = `${browser} on ${device}`;
-
-        // 3. Generate History
-        const now = new Date();
-        const past = new Date(now.getTime() - 86400000); // 1 day ago
-
-        // Current Session (Active)
-        const currentSession: SessionEntry = {
-          loginTime: now.toLocaleString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true, month: 'short', day: 'numeric', year: 'numeric' }),
-          logoutTime: 'Active',
-          ip: ip,
-          device: fullDevice,
-          status: 'active'
-        };
-
-        // Past Session (Mocked but using real IP/Device for consistency)
-        const pastSession: SessionEntry = {
-          loginTime: past.toLocaleString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true, month: 'short', day: 'numeric', year: 'numeric' }),
-          logoutTime: new Date(past.getTime() + 28800000).toLocaleString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true, month: 'short', day: 'numeric', year: 'numeric' }), // +8 hours
-          ip: ip, // Assuming same IP for demo
-          device: fullDevice, // Assuming same device
-          status: 'completed'
-        };
-
-        setHistory([currentSession, pastSession]);
-
-      } catch (error) {
-        console.error("Error loading session history", error);
+        const data = await getSessionHistory(userId);
+        // Only show top 2 (Active + Last Previous)
+        setHistory(data.slice(0, 2));
+      } catch (e) {
+        console.error(e);
       } finally {
         setLoading(false);
       }
     }
-
-    fetchSessionData();
+    load();
   }, [userId]);
 
   return (
@@ -105,9 +49,11 @@ export default function SessionHistoryModal({ role, userId, onClose }: Props) {
         {/* Content */}
         <div className="p-6 overflow-y-auto custom-scrollbar space-y-6 bg-white dark:bg-neutral-900">
 
-          <div className="flex items-center gap-2 text-sm text-neutral-500 dark:text-neutral-400">
-            <span>Recent activity for</span>
-            <span className="font-semibold text-neutral-900 dark:text-neutral-200 bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 rounded">{userId}</span>
+          <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center gap-2 text-neutral-500 dark:text-neutral-400">
+              <span>Recent activity for</span>
+              <span className="font-semibold text-neutral-900 dark:text-neutral-200 bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 rounded">{userId}</span>
+            </div>
           </div>
 
           {loading ? (
@@ -123,8 +69,8 @@ export default function SessionHistoryModal({ role, userId, onClose }: Props) {
                 <div
                   key={idx}
                   className={`relative rounded-lg border p-4 transition-all ${entry.status === 'active'
-                      ? 'bg-neutral-50 border-neutral-200 dark:bg-neutral-800/50 dark:border-neutral-700'
-                      : 'bg-white border-neutral-100 dark:bg-neutral-900 dark:border-neutral-800'
+                    ? 'bg-neutral-50 border-neutral-200 dark:bg-neutral-800/50 dark:border-neutral-700'
+                    : 'bg-white border-neutral-100 dark:bg-neutral-900 dark:border-neutral-800'
                     }`}
                 >
                   <div className="grid grid-cols-[80px_1fr] gap-y-3 gap-x-4 text-sm">
@@ -134,7 +80,7 @@ export default function SessionHistoryModal({ role, userId, onClose }: Props) {
                       <Clock className="w-3.5 h-3.5" /> Login
                     </div>
                     <div className="text-neutral-900 dark:text-neutral-200 font-medium font-mono tracking-tight">
-                      {entry.loginTime}
+                      {entry.login_time}
                     </div>
 
                     {/* Logout Row */}
@@ -151,7 +97,7 @@ export default function SessionHistoryModal({ role, userId, onClose }: Props) {
                           Active Now
                         </>
                       ) : (
-                        entry.logoutTime
+                        entry.logout_time
                       )}
                     </div>
 
@@ -160,7 +106,7 @@ export default function SessionHistoryModal({ role, userId, onClose }: Props) {
                       <Globe className="w-3.5 h-3.5" /> IP Addr
                     </div>
                     <div className="text-neutral-700 dark:text-neutral-300 font-mono text-xs">
-                      {entry.ip}
+                      <IPDisplay ip={entry.ip_address} />
                     </div>
 
                     {/* Device Row */}
@@ -168,7 +114,7 @@ export default function SessionHistoryModal({ role, userId, onClose }: Props) {
                       <Smartphone className="w-3.5 h-3.5" /> Device
                     </div>
                     <div className="text-neutral-700 dark:text-neutral-300">
-                      {entry.device}
+                      {entry.device_info}
                     </div>
 
                   </div>
@@ -179,7 +125,16 @@ export default function SessionHistoryModal({ role, userId, onClose }: Props) {
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-neutral-100 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900 flex justify-end">
+        <div className="p-4 border-t border-neutral-100 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900 flex justify-between items-center">
+          <button
+            onClick={() => {
+              onViewFullHistory();
+              onClose();
+            }}
+            className="flex items-center gap-2 text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium transition-colors"
+          >
+            <LayoutGrid className="w-4 h-4" /> View Full History
+          </button>
           <button
             onClick={onClose}
             className="px-6 py-2 bg-neutral-900 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200 rounded-lg text-sm font-semibold transition-all shadow-sm"

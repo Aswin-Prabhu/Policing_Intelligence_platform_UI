@@ -209,6 +209,10 @@ export function TopBar({
           userId={userId}
           username={username}
           onClose={() => setIsHistoryOpen(false)}
+          onViewFullHistory={() => {
+            setIsHistoryOpen(false);
+            onNavigate('session-history-full');
+          }}
         />
       )}
     </>
