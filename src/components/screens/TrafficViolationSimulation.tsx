@@ -82,10 +82,10 @@ export function TrafficViolationSimulation() {
                 let url = '';
 
                 if (file.type.startsWith('image/')) {
-                    url = `http://192.153.62.146/helmet/detect-image?camera_id=${cameraId}&save_snapshot=true`;
+                    url = `/api/helmet/detect-image?camera_id=${cameraId}&save_snapshot=true`;
                     formData.append('image', file);
                 } else {
-                    url = `http://192.153.62.146/helmet/detect-video?camera_id=${cameraId}&max_frames=100&sample_rate=5`;
+                    url = `/api/helmet/detect-video?camera_id=${cameraId}&max_frames=100&sample_rate=5`;
                     formData.append('video', file);
                 }
 
