@@ -313,7 +313,7 @@ export function IncidentAnalysis() {
                             <div className="flex border-b border-slate-100">
                                 {[
                                     { id: 'ai', label: 'AI Reasoning', icon: Activity },
-                                    { id: 'fir', label: 'FIR Report', icon: FileText },
+                                    { id: 'fir', label: 'Report', icon: FileText },
                                     { id: 'violations', label: 'Violation Data', icon: AlertTriangle },
                                 ].map(tab => (
                                     <button
@@ -401,12 +401,12 @@ export function IncidentAnalysis() {
                                     </div>
                                 )}
 
-                                {/* FIR REPORT TAB */}
+                                {/* REPORT TAB */}
                                 {activeTab === 'fir' && (
                                     <div className="animate-in slide-in-from-right-4 duration-300">
                                         <div className="bg-white border border-slate-200 shadow-sm p-8 max-w-2xl mx-auto rounded-none min-h-[500px]">
                                             <div className="text-center border-b border-black/10 pb-6 mb-6">
-                                                <h3 className="font-serif text-xl font-bold text-slate-900 mb-2">FIRST INFORMATION REPORT</h3>
+                                                <h3 className="font-serif text-xl font-bold text-slate-900 mb-2">INFORMATION REPORT</h3>
                                                 <p className="text-xs text-slate-500 uppercase tracking-widest font-serif">Kakinada Traffic Police Station - II</p>
                                             </div>
 

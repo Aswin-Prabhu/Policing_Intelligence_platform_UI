@@ -733,7 +733,7 @@ const snapshots = [];
 // Show FIR in modal/drawer
 const fir = await fetch(`/runs/${run_id}/file/fir.txt`);
 const firText = await fir.text();
-showModal('FIR Report', firText);
+showModal('Report', firText);
 ```
 
 ### Error Handling
