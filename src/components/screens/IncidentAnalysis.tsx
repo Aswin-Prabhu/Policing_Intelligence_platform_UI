@@ -2,18 +2,29 @@ import { useState, useRef, useEffect } from 'react';
 import {
     Upload, FileVideo, AlertTriangle, CheckCircle, FileText,
     Activity, Shield, Play, Pause, Maximize2, Download,
-    ChevronRight, ArrowRight, Siren, Clock, MapPin, BadgeAlert, BrainCircuit
+    ChevronRight, ArrowRight, Siren, Clock, MapPin, BadgeAlert, BrainCircuit, X
 } from 'lucide-react';
 
+interface AnalysisResult {
+    timestamp: string;
+    incidentType: 'Major Accident' | 'Minor Collision' | 'Near Miss';
+    confidence: number;
+    violationsCount: number;
+    involvedVehicles: { id: string; type: string; speed: string }[];
+    summary: string;
+}
+
 export function IncidentAnalysis() {
-    const [file, setFile] = useState<File | null>(null);
+    const [files, setFiles] = useState<File[]>([]);
     const [isDragging, setIsDragging] = useState(false);
     const [status, setStatus] = useState<'idle' | 'uploading' | 'processing' | 'completed'>('idle');
+    const [processingIndex, setProcessingIndex] = useState<number | null>(null);
     const [progress, setProgress] = useState(0);
+    const [results, setResults] = useState<AnalysisResult[]>([]);
+    const [selectedFileIndex, setSelectedFileIndex] = useState<number>(0);
+
     const [activeTab, setActiveTab] = useState<'fir' | 'ai' | 'violations'>('ai');
     const [isPlaying, setIsPlaying] = useState(false);
-
-    // Simulation Steps
     const [processingStep, setProcessingStep] = useState('');
 
     const handleDragOver = (e: React.DragEvent) => {
@@ -29,64 +40,109 @@ export function IncidentAnalysis() {
     const handleDrop = (e: React.DragEvent) => {
         e.preventDefault();
         setIsDragging(false);
-        const droppedFile = e.dataTransfer.files[0];
-        if (droppedFile && (droppedFile.type.startsWith('video/') || droppedFile.type.startsWith('image/'))) {
-            setFile(droppedFile);
+        const droppedFiles = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('video/') || f.type.startsWith('image/'));
+        if (droppedFiles.length > 0) {
+            setFiles(prev => [...prev, ...droppedFiles]);
+            // Reset if we were in a completed state to allow new analysis
+            if (status === 'completed') {
+                setStatus('idle');
+                setResults([]);
+                setProcessingIndex(null);
+            }
         }
     };
 
-    const startAnalysis = () => {
+    const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files) {
+            const newFiles = Array.from(e.target.files).filter(f => f.type.startsWith('video/') || f.type.startsWith('image/'));
+            setFiles(prev => [...prev, ...newFiles]);
+            if (status === 'completed') {
+                setStatus('idle');
+                setResults([]);
+                setProcessingIndex(null);
+            }
+        }
+    };
+
+    const removeFile = (index: number) => {
+        setFiles(prev => prev.filter((_, i) => i !== index));
+        if (status === 'completed') {
+            setResults(prev => prev.filter((_, i) => i !== index));
+            if (selectedFileIndex >= index && selectedFileIndex > 0) {
+                setSelectedFileIndex(prev => prev - 1);
+            }
+        }
+    };
+
+    const startAnalysis = async () => {
+        if (files.length === 0) return;
+
         setStatus('uploading');
         setProgress(0);
 
-        // Simulate upload
-        let p = 0;
-        const interval = setInterval(() => {
-            p += 5;
-            setProgress(p);
-            if (p >= 100) {
-                clearInterval(interval);
-                setStatus('processing');
-                runProcessingSimulation();
-            }
-        }, 100);
+        // Simulate upload phase
+        for (let i = 0; i <= 100; i += 10) {
+            setProgress(i);
+            await new Promise(r => setTimeout(r, 100));
+        }
+
+        setStatus('processing');
+        setResults([]);
+
+        for (let i = 0; i < files.length; i++) {
+            setProcessingIndex(i);
+            await processFile(files[i]);
+        }
+
+        setProcessingIndex(null);
+        setStatus('completed');
+        setSelectedFileIndex(0);
     };
 
-    const runProcessingSimulation = () => {
+    const processFile = async (file: File) => {
         const steps = [
             "Initializing YOLOv8-Track model...",
             "Detecting vehicles & pedestrians...",
             "Analyzing trajectory & speed (Kalman Filter)...",
             "Scanning for helmet violations (Motorcycle CI)...",
             "Detecting collision patterns (Temporal Voting)...",
-            "ACCIDENT CONFIRMED - Confidence 0.92",
             "Generating Forensic Evidence Snapshots...",
             "Drafting FIR with GenAI (Ollama)...",
             "Finalizing Cosmos Reasoning Analysis..."
         ];
 
-        let stepIndex = 0;
-        setProcessingStep(steps[0]);
+        for (const step of steps) {
+            setProcessingStep(step);
+            await new Promise(r => setTimeout(r, 600)); // Simulate processing time per step
+        }
 
-        const stepInterval = setInterval(() => {
-            stepIndex++;
-            if (stepIndex < steps.length) {
-                setProcessingStep(steps[stepIndex]);
-            } else {
-                clearInterval(stepInterval);
-                setStatus('completed');
-            }
-        }, 800);
+        // Generate mock result for this file
+        const mockResult: AnalysisResult = {
+            timestamp: new Date().toISOString(),
+            incidentType: Math.random() > 0.5 ? 'Major Accident' : 'Minor Collision',
+            confidence: Math.floor(Math.random() * 10 + 90),
+            violationsCount: Math.floor(Math.random() * 5),
+            involvedVehicles: [
+                { id: '02', type: 'Car', speed: `${Math.floor(Math.random() * 40 + 40)} km/h` },
+                { id: '05', type: 'Motorcycle', speed: `${Math.floor(Math.random() * 60 + 40)} km/h` }
+            ],
+            summary: `Analysis of ${file.name} indicates a high-probability incident.`
+        };
+
+        setResults(prev => [...prev, mockResult]);
     };
+
+    const currentResult = results[selectedFileIndex];
+    const currentFile = files[selectedFileIndex];
 
     const MockVideoPlayer = () => (
         <div className="relative aspect-video bg-black rounded-lg overflow-hidden group border border-slate-800 shadow-2xl">
             {/* Mock Video Content */}
             <div className="absolute inset-0 flex items-center justify-center">
-                {status === 'completed' ? (
+                {status === 'completed' && currentFile ? (
                     <div className="w-full h-full bg-slate-900 relative">
                         <div className="absolute top-4 left-4 text-green-400 font-mono text-xs bg-black/50 px-2 py-1 rounded border border-green-900/50">
-                            CAM_01 | 2024-02-11 14:32:05 | FPS: 25
+                            {currentFile.name.toUpperCase()} | 2024-02-11 14:32:05 | FPS: 25
                         </div>
 
                         {/* Concept of annotated video */}
@@ -102,14 +158,14 @@ export function IncidentAnalysis() {
                                 {/* Bike */}
                                 <div className="absolute left-10 top-0 w-16 h-24 border-2 border-red-500 bg-red-500/10 rounded">
                                     <div className="absolute -top-6 left-0 bg-red-600 text-white text-[10px] px-1 py-0.5 font-bold animate-pulse">
-                                        ACCIDENT 0.92
+                                        ACCIDENT {currentResult?.confidence ? (currentResult.confidence / 100).toFixed(2) : '0.92'}
                                     </div>
                                     <div className="absolute -bottom-6 left-0 bg-orange-600 text-white text-[10px] px-1 py-0.5 font-bold">
                                         NO HELMET
                                     </div>
                                 </div>
 
-                                {/* Colission Marker */}
+                                {/* Collision Marker */}
                                 <div className="absolute left-0 top-8 w-12 h-12 bg-yellow-500/20 rounded-full animate-ping"></div>
                             </div>
                         </div>
@@ -165,8 +221,14 @@ export function IncidentAnalysis() {
                 )}
             </div>
 
-            {/* Upload State */}
-            {status === 'idle' && (
+            {/* Upload Area for New Files (Always visible if needed, or when idle) */}
+            {(status === 'idle' || (status === 'completed' && files.length > 0)) && (
+                <div className={`mb-8 ${status === 'completed' ? 'hidden' : ''}`}> {/* Hide when completed to focus on results, or keep visible? Let's hide main drag drop when done */}
+                    {/* We can have a smaller upload button or just use the drag drop when idle */}
+                </div>
+            )}
+
+            {status === 'idle' ? (
                 <div
                     className={`
             border-2 border-dashed rounded-2xl p-16 text-center transition-all duration-300
@@ -191,10 +253,9 @@ export function IncidentAnalysis() {
                         type="file"
                         id="file-upload"
                         className="hidden"
-                        accept="video/*"
-                        onChange={(e) => {
-                            if (e.target.files?.[0]) setFile(e.target.files[0]);
-                        }}
+                        accept="video/*,image/*"
+                        multiple
+                        onChange={handleFileInput}
                     />
 
                     <div className="flex flex-col items-center gap-4">
@@ -205,21 +266,34 @@ export function IncidentAnalysis() {
                             Browse Files
                         </button>
 
-                        {file && (
-                            <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-lg border border-slate-200 shadow-sm animate-in fade-in slide-in-from-bottom-2">
-                                <FileVideo className="w-5 h-5 text-indigo-500" />
-                                <span className="text-sm font-medium text-slate-700">{file.name}</span>
+                        {/* File List for Idle State */}
+                        {files.length > 0 && (
+                            <div className="w-full max-w-lg mt-6 space-y-2">
+                                {files.map((f, i) => (
+                                    <div key={i} className="flex items-center justify-between bg-white px-4 py-3 rounded-lg border border-slate-200 shadow-sm animate-in fade-in slide-in-from-bottom-2">
+                                        <div className="flex items-center gap-3 overflow-hidden">
+                                            <FileVideo className="w-5 h-5 text-indigo-500 flex-shrink-0" />
+                                            <span className="text-sm font-medium text-slate-700 truncate">{f.name}</span>
+                                        </div>
+                                        <button
+                                            onClick={() => removeFile(i)}
+                                            className="ml-2 text-slate-400 hover:text-rose-500 p-1"
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                ))}
                                 <button
                                     onClick={startAnalysis}
-                                    className="ml-4 text-xs bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-md font-bold hover:bg-indigo-200 transition-colors"
+                                    className="w-full mt-4 text-sm bg-indigo-600 text-white px-4 py-3 rounded-lg font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200"
                                 >
-                                    ANALYZE NOW
+                                    Analyze {files.length} File{files.length > 1 ? 's' : ''}
                                 </button>
                             </div>
                         )}
                     </div>
                 </div>
-            )}
+            ) : null}
 
             {/* Processing State */}
             {(status === 'uploading' || status === 'processing') && (
@@ -231,7 +305,7 @@ export function IncidentAnalysis() {
                     </div>
 
                     <h2 className="text-2xl font-bold text-slate-900 mb-2">
-                        {status === 'uploading' ? 'Uploading Footage...' : 'Analyzing Incident'}
+                        {status === 'uploading' ? 'Uploading Footage...' : `Analyzing File ${processingIndex !== null ? processingIndex + 1 : 1} / ${files.length}`}
                     </h2>
                     <p className="text-cyan-600 font-mono text-sm mb-8 min-h-[20px]">
                         {status === 'processing' ? `> ${processingStep}` : `${progress}% Complete`}
@@ -247,10 +321,10 @@ export function IncidentAnalysis() {
             )}
 
             {/* Completed Dashboard */}
-            {status === 'completed' && (
+            {status === 'completed' && results.length > 0 && (
                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
 
-                    {/* Top Stats */}
+                    {/* Top Stats based on CURRENTLY SELECTED RESULT */}
                     <div className="grid grid-cols-4 gap-4 mb-6">
                         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                             <div className="flex items-center gap-2 text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">
@@ -262,26 +336,52 @@ export function IncidentAnalysis() {
                             <div className="flex items-center gap-2 text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">
                                 <AlertTriangle className="w-3 h-3 text-red-500" /> Type
                             </div>
-                            <div className="text-xl font-bold text-red-600">Major Accident</div>
+                            <div className="text-xl font-bold text-red-600">{currentResult?.incidentType}</div>
                         </div>
                         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                             <div className="flex items-center gap-2 text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">
                                 <Siren className="w-3 h-3 text-indigo-500" /> Confidence
                             </div>
-                            <div className="text-xl font-bold text-indigo-900">92% <span className="text-sm font-normal text-slate-400">Verified</span></div>
+                            <div className="text-xl font-bold text-indigo-900">{currentResult?.confidence}% <span className="text-sm font-normal text-slate-400">Verified</span></div>
                         </div>
                         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                             <div className="flex items-center gap-2 text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">
                                 <BadgeAlert className="w-3 h-3 text-orange-500" /> Violations
                             </div>
-                            <div className="text-xl font-bold text-slate-900">3 <span className="text-sm font-normal text-slate-400">Detected</span></div>
+                            <div className="text-xl font-bold text-slate-900">{currentResult?.violationsCount} <span className="text-sm font-normal text-slate-400">Detected</span></div>
                         </div>
                     </div>
 
                     <div className="grid grid-cols-12 gap-6 h-[600px]">
 
-                        {/* Left Column: Visuals */}
+                        {/* Left Column: List + Visuals */}
                         <div className="col-span-12 lg:col-span-5 flex flex-col gap-6">
+
+                            {/* File Selector */}
+                            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col max-h-48">
+                                <div className="p-3 bg-slate-50 border-b border-slate-200 text-xs font-bold uppercase text-slate-500">
+                                    Analyzed Files ({files.length})
+                                </div>
+                                <div className="overflow-y-auto p-2 space-y-2">
+                                    {files.map((f, i) => (
+                                        <button
+                                            key={i}
+                                            onClick={() => setSelectedFileIndex(i)}
+                                            className={`w-full text-left flex items-center justify-between p-2 rounded-lg text-sm transition-colors ${selectedFileIndex === i
+                                                ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                                                : 'hover:bg-slate-50 text-slate-700 border border-transparent'
+                                                }`}
+                                        >
+                                            <div className="flex items-center gap-2 truncate">
+                                                <div className={`w-2 h-2 rounded-full ${results[i]?.confidence > 90 ? 'bg-red-500' : 'bg-orange-400'}`} />
+                                                <span className="truncate max-w-[200px]">{f.name}</span>
+                                            </div>
+                                            <ChevronRight className={`w-4 h-4 ${selectedFileIndex === i ? 'text-indigo-500' : 'text-slate-300'}`} />
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
                             <MockVideoPlayer />
 
                             <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm p-4 overflow-hidden">
@@ -344,8 +444,7 @@ export function IncidentAnalysis() {
                                                 Causal Analysis (Cosmos AI)
                                             </h4>
                                             <p className="text-sm text-indigo-800 leading-relaxed">
-                                                Analysis verifies a collision between Vehicle ID 2 (Car) and Vehicle ID 5 (Motorcycle).
-                                                Primary causal factors identified with high confidence: <strong>Excessive Speed</strong> and <strong>Loss of Control</strong>.
+                                                {currentResult?.summary || "Analyzing..."}
                                             </p>
                                         </div>
 
@@ -380,7 +479,7 @@ export function IncidentAnalysis() {
                                         </div>
 
                                         <div>
-                                            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Sequence of Events</h4>
+                                            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Sequence of Events - {currentFile?.name}</h4>
                                             <div className="relative border-l-2 border-slate-200 ml-3 space-y-6 py-2">
                                                 {[
                                                     { t: '5.50s', text: 'Motorcycle ID:5 enters frame at high velocity (95 km/h).' },
@@ -412,10 +511,10 @@ export function IncidentAnalysis() {
 
                                             <div className="font-serif text-sm leading-8 text-slate-800 text-justify">
                                                 <p className="mb-4">
-                                                    <span className="font-bold">Subject:</span> Incident Report generated via Automated CCTV Analysis System (Ref: AI-RUN-2024-892)
+                                                    <span className="font-bold">Subject:</span> Incident Report generated via Automated CCTV Analysis System (Ref: AI-RUN-2024-892-{selectedFileIndex})
                                                 </p>
                                                 <p className="mb-4">
-                                                    On meticulous examination of the localized CCTV footage (Camera ID: CAM_01), an incident constituting a
+                                                    On meticulous examination of the localized CCTV footage (File: {currentFile?.name}), an incident constituting a
                                                     road traffic accident was definitively observed between the temporal markers of approximately
                                                     <span className="bg-yellow-100 px-1">5.50 seconds</span> and <span className="bg-yellow-100 px-1">8.50 seconds</span>.
                                                 </p>

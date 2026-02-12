@@ -12,6 +12,9 @@ interface ViolationResult {
     vehicle_plate?: string;
     is_stolen?: boolean;
     is_blacklisted?: boolean;
+    bbox?: number[]; // [xmin, ymin, xmax, ymax]
+    detections?: any[];
+    violation_details?: string;
     gov_data?: {
         owner_name: string;
         manufacturer: string;
@@ -24,70 +27,169 @@ interface ViolationResult {
 }
 
 export function TrafficViolationSimulation() {
-    const [file, setFile] = useState<File | null>(null);
-    const [analyzing, setAnalyzing] = useState(false);
-    const [result, setResult] = useState<ViolationResult | null>(null);
+    const [files, setFiles] = useState<File[]>([]);
+    const [analyzingIndex, setAnalyzingIndex] = useState<number | null>(null);
+    const [results, setResults] = useState<ViolationResult[]>([]);
+    const [selectedResultIndex, setSelectedResultIndex] = useState<number | null>(null);
     const [cameraId, setCameraId] = useState('traffic_cam_1');
 
+    const selectedResult = selectedResultIndex !== null ? results[selectedResultIndex] : null;
+    const selectedFile = selectedResultIndex !== null ? files[selectedResultIndex] : null;
+
     const [stats, setStats] = useState({
-        total: 124,
-        tripleRiding: 45,
-        noHelmet: 79
+        total: 0,
+        tripleRiding: 0,
+        noHelmet: 0
     });
 
     const handleDrop = (e: React.DragEvent) => {
         e.preventDefault();
-        const droppedFile = e.dataTransfer.files[0];
-        if (droppedFile && (droppedFile.type.startsWith('image/') || droppedFile.type.startsWith('video/'))) {
-            setFile(droppedFile);
-            setResult(null);
+        const droppedFiles = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/') || f.type.startsWith('video/'));
+        if (droppedFiles.length > 0) {
+            setFiles(prev => [...prev, ...droppedFiles]);
+            setResults([]);
+            setSelectedResultIndex(null);
         }
     };
 
-    const handleAnalyze = () => {
-        if (!file) return;
+    const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files) {
+            const newFiles = Array.from(e.target.files).filter(f => f.type.startsWith('image/') || f.type.startsWith('video/'));
+            setFiles(prev => [...prev, ...newFiles]);
+            setResults([]);
+            setSelectedResultIndex(null);
+        }
+    };
 
-        setAnalyzing(true);
-        // Simulate AI inference + DB Lookup delay
-        setTimeout(() => {
-            const scenario = Math.random();
-            let isStolen = false;
-            let isBlacklisted = false;
-            let violationType: 'No Helmet' | 'Triple Riding' = 'No Helmet';
+    const removeFile = (index: number) => {
+        setFiles(prev => prev.filter((_, i) => i !== index));
+        setResults([]);
+        setSelectedResultIndex(null);
+    };
 
-            // 10% Chance Stolen, 15% Chance Blacklisted, 50% Triple Riding
-            if (scenario < 0.1) isStolen = true;
-            else if (scenario < 0.25) isBlacklisted = true;
+    const handleAnalyze = async () => {
+        if (files.length === 0) return;
 
-            if (Math.random() > 0.5) violationType = 'Triple Riding';
+        setResults([]);
+        setSelectedResultIndex(null);
 
-            const mockResult: ViolationResult = {
-                hasViolation: true,
-                violation_type: violationType,
-                helmet_confidence: Math.floor(Math.random() * 5 + 95), // 95-99%
-                vehicle_plate: `AP 39 ${String.fromCharCode(65 + Math.random() * 26)}${String.fromCharCode(65 + Math.random() * 26)} ${Math.floor(Math.random() * 8999 + 1000)}`,
-                is_stolen: isStolen,
-                is_blacklisted: isBlacklisted,
-                gov_data: {
-                    owner_name: isStolen ? 'REPORTED STOLEN' : (violationType === 'Triple Riding' ? 'Rajesh Kumar' : 'Suresh Babu'),
-                    manufacturer: violationType === 'Triple Riding' ? 'Honda' : 'Hero',
-                    model: violationType === 'Triple Riding' ? 'Activa 6G' : 'Splendor+',
-                    registration_date: '2022-03-15',
-                    pending_challans: isBlacklisted ? Math.floor(Math.random() * 5 + 3) : Math.floor(Math.random() * 2),
-                    insurance_valid_upto: '2025-03-15',
-                    pollution_certification_upto: '2024-09-01'
+        for (let i = 0; i < files.length; i++) {
+            setAnalyzingIndex(i);
+            const file = files[i];
+
+            try {
+                const formData = new FormData();
+                let url = '';
+
+                if (file.type.startsWith('image/')) {
+                    url = `http://192.153.62.146/helmet/detect-image?camera_id=${cameraId}&save_snapshot=true`;
+                    formData.append('image', file);
+                } else {
+                    url = `http://192.153.62.146/helmet/detect-video?camera_id=${cameraId}&max_frames=100&sample_rate=5`;
+                    formData.append('video', file);
                 }
-            };
 
-            setResult(mockResult);
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'accept': 'application/json',
+                    },
+                    body: formData
+                });
 
-            setStats(prev => ({
-                total: prev.total + 1,
-                tripleRiding: violationType === 'Triple Riding' ? prev.tripleRiding + 1 : prev.tripleRiding,
-                noHelmet: violationType === 'No Helmet' ? prev.noHelmet + 1 : prev.noHelmet
-            }));
-            setAnalyzing(false);
-        }, 2500);
+                if (!response.ok) throw new Error(`API error: ${response.statusText}`);
+
+                const apiData = await response.json();
+                console.log(`API Response for ${file.name}:`, apiData);
+
+                // Handle the new response structure
+                const data = apiData;
+                const firstViolation = data.violations?.[0];
+                const firstVehicle = data.detected_vehicles?.find((v: any) => v.plate) || data.detected_vehicles?.[0];
+
+                // Extract BBox from violation first, then vehicle
+                let box = firstViolation?.riders?.[0]?.box || firstVehicle?.bbox;
+
+                const result: ViolationResult = {
+                    hasViolation: data.detected || (data.violation_count > 0),
+                    violation_type: (() => {
+                        const types = firstViolation?.violation_type?.split(',') || [];
+                        const mapped = types.map((t: string) => {
+                            const trimmed = t.trim();
+                            if (trimmed === 'triplets') return 'Triple Riding';
+                            if (trimmed === 'no_helmet') return 'No Helmet';
+                            return trimmed;
+                        });
+                        return mapped.length > 0 ? mapped.join(' + ') : undefined;
+                    })() as any,
+                    helmet_confidence: (() => {
+                        if (!firstViolation) return undefined;
+
+                        // If Triple Riding is present, use the strongest detection confidence
+                        const rideConf = firstViolation.riders?.[0] ? Math.round(firstViolation.riders[0].confidence * 100) : 0;
+                        const helmetConf = firstViolation.riders?.[0] ? Math.round(firstViolation.riders[0].helmet_confidence * 100) : 0;
+
+                        // If helmet confidence is 0 but it's a violation, use detection confidence as proxy
+                        if (helmetConf === 0 && rideConf > 0) return rideConf;
+                        return helmetConf > 0 ? helmetConf : (rideConf > 0 ? rideConf : undefined);
+                    })(),
+                    violation_details: (() => {
+                        if (!firstViolation) return undefined;
+                        const details = [];
+                        if (firstViolation.violation_type?.includes('triplets')) {
+                            details.push(`${firstViolation.people_count} People`);
+                        }
+                        if (firstViolation.violation_type?.includes('no_helmet')) {
+                            details.push('No Helmet');
+                        }
+                        return details.length > 0 ? details.join(' | ') : undefined;
+                    })(),
+                    vehicle_plate: firstViolation?.vehicle_plate || firstVehicle?.plate || '-',
+                    is_stolen: data.detected_vehicles?.some((v: any) => v.is_stolen) || false,
+                    is_blacklisted: data.detected_vehicles?.some((v: any) => v.is_blacklisted) || false,
+                    bbox: box,
+                    detections: data.violations || data.detected_vehicles,
+                    gov_data: firstVehicle?.gov_data || {
+                        owner_name: firstVehicle?.gov_data?.owner_name || '-',
+                        manufacturer: firstVehicle?.color ? firstVehicle.color.charAt(0).toUpperCase() + firstVehicle.color.slice(1) : '-',
+                        model: firstVehicle?.vehicle_type || '-',
+                        registration_date: '-',
+                        pending_challans: 0,
+                        insurance_valid_upto: '-',
+                        pollution_certification_upto: '-'
+                    }
+                };
+
+                setResults(prev => [...prev, result]);
+
+                // Update stats
+                setStats(prev => ({
+                    total: prev.total + 1,
+                    tripleRiding: result.violation_type === 'Triple Riding' ? prev.tripleRiding + 1 : prev.tripleRiding,
+                    noHelmet: result.violation_type === 'No Helmet' ? prev.noHelmet + 1 : prev.noHelmet
+                }));
+
+            } catch (error) {
+                console.error(`Analysis failed for ${file.name}:`, error);
+
+                // Push a placeholder result on failure to keep the queue in sync
+                const errorResult: ViolationResult = {
+                    hasViolation: false,
+                    violation_type: undefined,
+                    vehicle_plate: 'Error',
+                    gov_data: {
+                        owner_name: '-',
+                        manufacturer: '-',
+                        model: '-',
+                        registration_date: '-',
+                        pending_challans: 0
+                    }
+                };
+                setResults(prev => [...prev, errorResult]);
+            }
+        }
+        setAnalyzingIndex(null);
+        if (files.length > 0) setSelectedResultIndex(0);
     };
 
     return (
@@ -116,22 +218,40 @@ export function TrafficViolationSimulation() {
                         <div
                             onDragOver={(e) => e.preventDefault()}
                             onDrop={handleDrop}
-                            className={`border-2 border-dashed rounded-xl flex flex-col items-center justify-center p-6 transition-colors h-64 ${file ? 'border-indigo-500 bg-indigo-50/30' : 'border-slate-300 hover:border-indigo-400 hover:bg-slate-50'
+                            className={`border-2 border-dashed rounded-xl flex flex-col items-center justify-center p-6 transition-colors h-64 ${files.length > 0 ? 'border-indigo-500 bg-indigo-50/30' : 'border-slate-300 hover:border-indigo-400 hover:bg-slate-50'
                                 }`}
                         >
-                            {file ? (
-                                <div className="text-center">
-                                    <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-3 border-4 border-white shadow-sm">
-                                        {file.type.startsWith('video') ? <Video className="w-6 h-6 text-indigo-600" /> : <Camera className="w-6 h-6 text-indigo-600" />}
+                            {files.length > 0 ? (
+                                <div className="w-full h-full overflow-y-auto custom-scrollbar px-2">
+                                    <div className="flex flex-col gap-2">
+                                        {files.map((f, i) => (
+                                            <div key={i} className="flex items-center justify-between bg-white border border-slate-200 p-2 rounded-lg shadow-sm">
+                                                <div className="flex items-center gap-3 overflow-hidden">
+                                                    <div className="w-8 h-8 bg-slate-100 rounded-md flex items-center justify-center flex-shrink-0">
+                                                        {f.type.startsWith('video') ? <Video className="w-4 h-4 text-slate-500" /> : <Camera className="w-4 h-4 text-slate-500" />}
+                                                    </div>
+                                                    <div className="flex flex-col truncate">
+                                                        <span className="text-xs font-medium text-slate-700 truncate">{f.name}</span>
+                                                        <span className="text-[10px] text-slate-400">{(f.size / 1024 / 1024).toFixed(2)} MB</span>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={() => removeFile(i)}
+                                                    className="p-1 hover:bg-rose-50 text-slate-400 hover:text-rose-500 rounded transition-colors"
+                                                >
+                                                    <X className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        ))}
                                     </div>
-                                    <p className="font-bold text-slate-900 text-sm truncate max-w-[200px]">{file.name}</p>
-                                    <p className="text-xs text-slate-500 mb-4">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
-                                    <button
-                                        onClick={() => { setFile(null); setResult(null); }}
-                                        className="px-3 py-1.5 bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-medium flex items-center gap-1 mx-auto transition-colors"
-                                    >
-                                        <X className="w-3 h-3" /> Remove
-                                    </button>
+                                    <div className="mt-4 text-center">
+                                        <button
+                                            onClick={() => { setFiles([]); setResults([]); }}
+                                            className="text-xs text-rose-500 hover:underline"
+                                        >
+                                            Clear All
+                                        </button>
+                                    </div>
                                 </div>
                             ) : (
                                 <div className="text-center">
@@ -139,18 +259,14 @@ export function TrafficViolationSimulation() {
                                         <Camera className="w-6 h-6 text-slate-400" />
                                     </div>
                                     <p className="font-semibold text-slate-900 text-sm">Click or Drag & Drop</p>
-                                    <p className="text-xs text-slate-500 mt-1">JPG, PNG, MP4</p>
+                                    <p className="text-xs text-slate-500 mt-1">JPG, PNG, MP4 (Multiple Allowed)</p>
                                     <input
                                         type="file"
                                         className="hidden"
                                         id="file-upload"
                                         accept="image/*,video/*"
-                                        onChange={(e) => {
-                                            if (e.target.files?.[0]) {
-                                                setFile(e.target.files[0]);
-                                                setResult(null);
-                                            }
-                                        }}
+                                        multiple
+                                        onChange={handleFileInput}
                                     />
                                     <label
                                         htmlFor="file-upload"
@@ -173,22 +289,22 @@ export function TrafficViolationSimulation() {
                                 />
                             </div>
                             <button
-                                disabled={!file || analyzing}
+                                disabled={files.length === 0 || analyzingIndex !== null}
                                 onClick={handleAnalyze}
-                                className={`w-full py-2.5 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-all ${!file || analyzing
+                                className={`w-full py-2.5 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-all ${files.length === 0 || analyzingIndex !== null
                                     ? 'bg-slate-200 !text-slate-400 cursor-not-allowed'
                                     : 'bg-indigo-600 text-slate-50 hover:bg-indigo-700 hover:shadow-lg'
                                     }`}
                             >
-                                {analyzing ? (
+                                {analyzingIndex !== null ? (
                                     <>
                                         <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                        Processing...
+                                        Processing {analyzingIndex + 1}/{files.length}...
                                     </>
                                 ) : (
                                     <>
                                         <Brain className="w-4 h-4" />
-                                        Analyze
+                                        Analyze {files.length > 0 ? `(${files.length})` : ''}
                                     </>
                                 )}
                             </button>
@@ -243,70 +359,148 @@ export function TrafficViolationSimulation() {
                         Detection Results & Analysis
                     </h2>
 
+                    {/* Pending/Processing Status */}
+                    {analyzingIndex !== null && (
+                        <div className="mb-6 bg-indigo-50 border border-indigo-100 p-4 rounded-lg flex items-center justify-between animate-pulse">
+                            <div className="flex items-center gap-3">
+                                <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                                <div>
+                                    <h4 className="text-sm font-bold text-indigo-900">Processing Queue</h4>
+                                    <p className="text-xs text-indigo-700">Analyzing file {analyzingIndex + 1} of {files.length} ({files[analyzingIndex]?.name})...</p>
+                                </div>
+                            </div>
+                            <span className="text-xs font-mono font-bold text-indigo-600 bg-white px-2 py-1 rounded">
+                                {Math.round(((analyzingIndex) / files.length) * 100)}%
+                            </span>
+                        </div>
+                    )}
+
+                    {/* Result Tabs/Filmstrip */}
+                    {results.length > 0 && (
+                        <div className="mb-4 flex gap-3 overflow-x-auto pb-2 custom-scrollbar">
+                            {results.map((r, i) => (
+                                <button
+                                    key={i}
+                                    onClick={() => setSelectedResultIndex(i)}
+                                    className={`flex-shrink-0 w-40 p-2 rounded-lg border text-left transition-all ${selectedResultIndex === i
+                                        ? 'border-indigo-500 bg-indigo-50 ring-1 ring-indigo-500 shadow-sm'
+                                        : 'border-slate-200 hover:border-indigo-300 bg-slate-50'
+                                        }`}
+                                >
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="text-[10px] font-bold text-slate-500 uppercase">File {i + 1}</span>
+                                        {r.is_stolen ? (
+                                            <ShieldAlert className="w-3 h-3 text-red-500" />
+                                        ) : r.hasViolation ? (
+                                            <ShieldAlert className="w-3 h-3 text-amber-500" />
+                                        ) : (
+                                            <CheckCircle className="w-3 h-3 text-emerald-500" />
+                                        )}
+                                    </div>
+                                    <div className="text-xs font-bold text-slate-800 truncate mb-0.5">{files[i]?.name}</div>
+                                    <div className={`text-[10px] font-medium truncate ${r.hasViolation ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                        {r.violation_type || 'Clean'}
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
                     <div className="flex-1 bg-slate-50 rounded-xl flex items-center justify-center border border-slate-200 relative overflow-hidden">
-                        {analyzing ? (
+                        {analyzingIndex !== null && results.length === 0 ? (
                             <div className="text-center p-8">
                                 <div className="relative w-24 h-24 mx-auto mb-6">
                                     <div className="absolute inset-0 border-4 border-indigo-100 rounded-full"></div>
                                     <div className="absolute inset-0 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
                                     <Brain className="absolute inset-0 m-auto w-10 h-10 text-indigo-600 animate-pulse" />
                                 </div>
-                                <h3 className="text-xl font-bold text-slate-800 mb-2">Analyzing Footage</h3>
-                                <p className="text-slate-500 mb-8">Running AI models and querying VAHAN database...</p>
-                                <div className="space-y-3 max-w-xs mx-auto text-left pl-8">
-                                    <div className="flex items-center gap-3 text-sm text-slate-600">
-                                        <CheckCircle className="w-4 h-4 text-emerald-500" /> Helmet Detection Model
-                                    </div>
-                                    <div className="flex items-center gap-3 text-sm text-slate-600">
-                                        <CheckCircle className="w-4 h-4 text-emerald-500" /> Triple Riding Model
-                                    </div>
-                                    <div className="flex items-center gap-3 text-sm text-slate-600">
-                                        <div className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" /> Vehicle Owner Lookup
-                                    </div>
-                                </div>
+                                <h3 className="text-xl font-bold text-slate-800 mb-2">Initializing Analysis</h3>
+                                <p className="text-slate-500 mb-8">Queuing {files.length} files for sequential processing...</p>
                             </div>
-                        ) : result ? (
+                        ) : selectedResult ? (
                             <div className="w-full h-full p-6 flex flex-col bg-slate-50/50">
                                 <div className="flex gap-6 h-full">
                                     {/* Left: Image Preview */}
                                     <div className="w-1/2 flex flex-col">
-                                        <div className="flex-1 bg-black rounded-xl relative overflow-hidden group shadow-lg">
-                                            {file?.type.startsWith('image/') ? (
-                                                <img src={URL.createObjectURL(file)} alt="analyzed" className="w-full h-full object-cover opacity-90" />
-                                            ) : (
-                                                <div className="w-full h-full flex items-center justify-center bg-slate-900">
-                                                    <Video className="w-16 h-16 text-slate-600" />
+                                        <div className="flex-1 bg-black rounded-xl relative overflow-hidden group shadow-lg border border-slate-800 flex items-center justify-center">
+                                            <div className="relative max-w-full max-h-full">
+                                                {selectedFile?.type.startsWith('image/') ? (
+                                                    <img
+                                                        src={URL.createObjectURL(selectedFile)}
+                                                        alt="analyzed"
+                                                        className="max-w-full max-h-[480px] object-contain block"
+                                                    />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center bg-slate-900 min-h-[300px] min-w-[400px]">
+                                                        <Video className="w-16 h-16 text-slate-800" />
+                                                    </div>
+                                                )}
+
+                                                {/* Dynamic Bounding Box from API */}
+                                                {selectedResult.bbox && selectedResult.bbox.length === 4 && (
+                                                    <div
+                                                        className="absolute border-2 border-rose-500 rounded bg-rose-500/10 shadow-[0_0_10px_rgba(244,63,94,0.5)] transition-all duration-300"
+                                                        style={{
+                                                            left: `${(selectedResult.bbox[0] / 10).toFixed(2)}%`,
+                                                            top: `${(selectedResult.bbox[1] / 10).toFixed(2)}%`,
+                                                            width: `${((selectedResult.bbox[2] - selectedResult.bbox[0]) / 10).toFixed(2)}%`,
+                                                            height: `${((selectedResult.bbox[3] - selectedResult.bbox[1]) / 10).toFixed(2)}%`,
+                                                        }}
+                                                    >
+                                                        <div className="absolute -top-5 left-0 flex items-center gap-1">
+                                                            <span className="bg-rose-600 text-white text-[8px] uppercase font-black px-1.5 py-0.5 rounded shadow-lg whitespace-nowrap border border-rose-400">
+                                                                {selectedResult.violation_type || 'OBJECT'} {selectedResult.helmet_confidence ? `(${selectedResult.helmet_confidence}%)` : ''}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {!selectedResult.bbox && selectedResult.hasViolation && (
+                                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-rose-600/20 px-4 py-2 rounded-lg border border-rose-500 backdrop-blur-md">
+                                                    <p className="text-white font-bold text-sm uppercase tracking-widest">{selectedResult.violation_type}</p>
                                                 </div>
                                             )}
-
-                                            {/* Bounding Box Mockup */}
-                                            <div className="absolute top-1/4 left-1/4 w-40 h-40 border-2 border-rose-500 rounded bg-rose-500/10 backdrop-blur-[2px] flex items-center justify-center">
-                                                <span className="bg-rose-600 text-white text-[10px] uppercase font-bold px-2 py-1 absolute -top-3 left-0 rounded shadow-sm">
-                                                    {result.violation_type} ({result.helmet_confidence}%)
-                                                </span>
-                                            </div>
                                         </div>
-                                        <div className="mt-4 bg-white p-3 rounded-lg border border-slate-200 text-xs text-slate-500 flex justify-between">
-                                            <span>Frame ID: 89334-A</span>
-                                            <span>Timestamp: {new Date().toLocaleTimeString()}</span>
+                                        <div className="mt-4 bg-white p-3 rounded-lg border border-slate-200 text-[10px] text-slate-500 flex justify-between font-mono">
+                                            <span>FILE: {selectedFile?.name}</span>
+                                            <span>RESULT_ID: #{((selectedResultIndex || 0) + 1)}_{selectedFile?.name.split('.')[0]}</span>
                                         </div>
                                     </div>
 
                                     {/* Right: Details Panel */}
-                                    <div className="w-1/2 flex flex-col space-y-4">
+                                    <div className="w-1/2 flex flex-col space-y-4 overflow-y-auto custom-scrollbar pr-1">
+
+                                        {/* Status Header */}
+                                        <div className={`p-4 rounded-xl border flex items-center justify-between shadow-sm ${selectedResult.hasViolation ? 'bg-rose-50 border-rose-100' : 'bg-emerald-50 border-emerald-100'}`}>
+                                            <div className="flex items-center gap-3">
+                                                <div className={`p-2 rounded-lg ${selectedResult.hasViolation ? 'bg-rose-100' : 'bg-emerald-100'}`}>
+                                                    {selectedResult.hasViolation ? <ShieldAlert className="w-5 h-5 text-rose-600" /> : <CheckCircle className="w-5 h-5 text-emerald-600" />}
+                                                </div>
+                                                <div>
+                                                    <div className={`text-[10px] font-black uppercase tracking-widest ${selectedResult.hasViolation ? 'text-rose-600' : 'text-emerald-600'}`}>Status Update</div>
+                                                    <div className="text-lg font-bold text-slate-900">{selectedResult.hasViolation ? selectedResult.violation_type : 'No Violations Detected'}</div>
+                                                </div>
+                                            </div>
+                                            {!selectedResult.hasViolation && (
+                                                <div className="bg-emerald-600 text-white text-[10px] font-bold px-2 py-1 rounded shadow-sm uppercase">CLEAN</div>
+                                            )}
+                                        </div>
 
                                         {/* Critical Alerts */}
-                                        {result.is_stolen && (
-                                            <div className="bg-red-100 border border-red-200 rounded-lg p-3 flex items-center gap-3 animate-pulse">
-                                                <ShieldAlert className="w-6 h-6 text-red-600" />
+                                        {selectedResult.is_stolen && (
+                                            <div className="bg-red-600 rounded-lg p-3 flex items-center gap-3 border border-red-700 shadow-lg animate-pulse">
+                                                <div className="bg-white/20 p-1.5 rounded-md">
+                                                    <ShieldAlert className="w-5 h-5 text-white" />
+                                                </div>
                                                 <div>
-                                                    <div className="text-red-800 font-bold uppercase text-sm">CRITICAL ALERT: STOLEN VEHICLE</div>
-                                                    <div className="text-red-600 text-xs">Immediate action required. Notify nearest patrol.</div>
+                                                    <div className="text-white font-black uppercase text-[10px] tracking-widest">CRITICAL SYSTEM ALERT</div>
+                                                    <div className="text-white text-xs font-bold font-mono">VEHICLE REPORTED STOLEN</div>
                                                 </div>
                                             </div>
                                         )}
 
-                                        {!result.is_stolen && result.is_blacklisted && (
+                                        {!selectedResult.is_stolen && selectedResult.is_blacklisted && (
                                             <div className="bg-amber-100 border border-amber-200 rounded-lg p-3 flex items-center gap-3">
                                                 <ShieldAlert className="w-6 h-6 text-amber-600" />
                                                 <div>
@@ -318,62 +512,76 @@ export function TrafficViolationSimulation() {
 
                                         {/* Violation Card */}
                                         <div className="bg-white p-4 rounded-xl border border-rose-100 shadow-sm relative overflow-hidden">
-                                            <div className="absolute top-0 right-0 w-24 h-24 bg-rose-50 rounded-bl-full -mr-4 -mt-4" />
+                                            <div className="absolute top-0 right-0 w-24 h-24 bg-rose-50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110" />
                                             <div className="relative">
-                                                <div className="text-xs font-bold text-rose-600 uppercase tracking-wider mb-2">Detected Violation</div>
-                                                <div className="text-xl font-bold text-slate-800 flex items-center gap-2 mb-1">
-                                                    <ShieldAlert className={`w-5 h-5 ${result.violation_type === 'No Helmet' ? 'text-rose-600' : 'text-amber-500'}`} />
-                                                    {result.violation_type}
+                                                <div className="text-[10px] font-black text-rose-600 uppercase tracking-widest mb-2 flex items-center gap-1">
+                                                    <div className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-pulse" />
+                                                    AI Detection Analysis
                                                 </div>
-                                                <div className="text-sm text-slate-500">Confidence Score: <span className="font-bold text-emerald-600">{result.helmet_confidence}%</span></div>
+                                                <div className="text-2xl font-black text-slate-900 flex items-center gap-2 mb-1">
+                                                    {selectedResult.hasViolation ? selectedResult.violation_type : 'System Clear'}
+                                                </div>
+                                                {selectedResult.violation_details && (
+                                                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 bg-slate-100 w-fit px-2 py-0.5 rounded">
+                                                        {selectedResult.violation_details}
+                                                    </div>
+                                                )}
+                                                <div className="text-xs text-slate-500 font-medium">Confidence Score: <span className={`font-bold ${selectedResult.helmet_confidence && selectedResult.helmet_confidence > 70 ? 'text-emerald-600' : 'text-orange-500'}`}>{selectedResult.helmet_confidence !== undefined ? `${selectedResult.helmet_confidence}%` : '-'}</span></div>
                                             </div>
                                         </div>
 
                                         {/* Vehicle/Owner Details */}
                                         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex-1">
-                                            <div className="text-xs font-bold text-indigo-700 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                            <div className="text-[10px] font-black text-indigo-700 uppercase tracking-widest mb-4 flex items-center gap-2">
                                                 <div className="w-2 h-2 bg-indigo-500 rounded-full" />
                                                 Vehicle Registry (VAHAN)
                                             </div>
-                                            <div className="space-y-3">
+                                            <div className="space-y-4">
                                                 <div className="grid grid-cols-2 gap-4">
-                                                    <div>
-                                                        <div className="text-[10px] text-slate-600 font-bold uppercase">Registration No.</div>
-                                                        <div className="font-mono font-bold text-slate-800 text-base">{result.vehicle_plate}</div>
+                                                    <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                                        <div className="text-[10px] text-slate-500 font-black uppercase mb-1">Plate Number</div>
+                                                        <div className="font-mono font-black text-slate-800 text-sm tracking-tighter">{selectedResult.vehicle_plate}</div>
                                                     </div>
-                                                    <div>
-                                                        <div className="text-[10px] text-slate-600 font-bold uppercase">Owner Name</div>
-                                                        <div className="font-bold text-slate-800 text-base truncate">{result.gov_data?.owner_name}</div>
+                                                    <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                                        <div className="text-[10px] text-slate-500 font-black uppercase mb-1">Registered Owner</div>
+                                                        <div className="font-bold text-slate-800 text-sm flex items-center gap-1">
+                                                            <User className="w-3 h-3 text-slate-400" />
+                                                            {selectedResult.gov_data?.owner_name}
+                                                        </div>
                                                     </div>
                                                 </div>
 
                                                 <div className="grid grid-cols-2 gap-4">
                                                     <div>
-                                                        <div className="text-[10px] text-slate-600 font-bold uppercase">Make / Model</div>
-                                                        <div className="font-medium text-slate-700 text-sm">{result.gov_data?.manufacturer} {result.gov_data?.model}</div>
+                                                        <div className="text-[10px] text-slate-400 font-bold uppercase mb-1">Make / Model</div>
+                                                        <div className="font-bold text-slate-700 text-xs">{selectedResult.gov_data?.manufacturer} {selectedResult.gov_data?.model}</div>
                                                     </div>
                                                     <div>
-                                                        <div className="text-[10px] text-slate-600 font-bold uppercase">Reg. Date</div>
-                                                        <div className="font-medium text-slate-700 text-sm">{result.gov_data?.registration_date}</div>
+                                                        <div className="text-[10px] text-slate-400 font-bold uppercase mb-1">Reg. Date</div>
+                                                        <div className="font-bold text-slate-700 text-xs">{selectedResult.gov_data?.registration_date}</div>
                                                     </div>
                                                 </div>
 
-                                                <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-                                                    <div className="text-xs font-medium text-slate-500">Pending Challans</div>
-                                                    <div className={`text-sm font-bold ${result.gov_data?.pending_challans || 0 > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                                                        {result.gov_data?.pending_challans} Pending
+                                                <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className={`w-2 h-2 rounded-full ${selectedResult.gov_data?.pending_challans ? 'bg-rose-500' : 'bg-emerald-500'}`} />
+                                                        <span className="text-[10px] font-bold text-slate-500 uppercase">Traffic History</span>
+                                                    </div>
+                                                    <div className={`text-xs font-black ${selectedResult.gov_data?.pending_challans ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                                        {selectedResult.gov_data?.pending_challans || 0} Pending Challans
                                                     </div>
                                                 </div>
                                             </div>
                                         </div>
 
                                         {/* Action */}
-                                        <div className="flex items-center gap-3">
-                                            <div className="flex-1 bg-green-50 border border-green-200 p-2.5 rounded-lg flex items-center justify-center gap-2 text-green-700 font-bold text-sm">
-                                                <CheckCircle className="w-4 h-4" /> Challan Generated
+                                        <div className="flex items-center gap-3 pt-2">
+                                            <div className={`flex-1 p-2.5 rounded-lg flex items-center justify-center gap-2 font-black text-xs uppercase tracking-widest border transition-all ${selectedResult.hasViolation ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-emerald-50 border-emerald-200 text-emerald-700'}`}>
+                                                {selectedResult.hasViolation ? <ShieldAlert className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
+                                                {selectedResult.hasViolation ? 'Violation Flagged' : 'Passed Analysis'}
                                             </div>
-                                            <button className="flex-1 bg-slate-800 text-white p-2.5 rounded-lg font-medium text-sm hover:bg-slate-900 shadow">
-                                                Print / Export
+                                            <button className="flex-1 bg-slate-900 text-white p-2.5 rounded-lg font-bold text-xs uppercase tracking-widest hover:bg-black shadow-lg transition-all active:scale-95">
+                                                Generate Challan
                                             </button>
                                         </div>
                                     </div>
@@ -389,6 +597,6 @@ export function TrafficViolationSimulation() {
                 </div>
 
             </div>
-        </div>
+        </div >
     );
 }
