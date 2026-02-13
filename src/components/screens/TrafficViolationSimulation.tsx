@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import {
     Car, ShieldAlert, Upload,
-    Activity, Video, Brain, X, CheckCircle, FileText, User, MapPin
+    Activity, Video, Brain, X, CheckCircle, User, Camera
 } from 'lucide-react';
-import { Camera } from 'lucide-react';
+import { ZoomPanContainer } from '../ZoomPanContainer';
 
 interface ViolationResult {
     hasViolation: boolean;
@@ -422,13 +422,13 @@ export function TrafficViolationSimulation() {
                                 <div className="flex gap-6 h-full">
                                     {/* Left: Image Preview */}
                                     <div className="w-1/2 flex flex-col">
-                                        <div className="flex-1 bg-black rounded-xl relative overflow-hidden group shadow-lg border border-slate-800 flex items-center justify-center">
-                                            <div className="relative max-w-full max-h-full">
+                                        <ZoomPanContainer className="flex-1 bg-black rounded-xl shadow-lg border border-slate-800">
+                                            <div className="relative w-full h-full flex items-center justify-center">
                                                 {selectedFile?.type.startsWith('image/') ? (
                                                     <img
                                                         src={URL.createObjectURL(selectedFile)}
                                                         alt="analyzed"
-                                                        className="max-w-full max-h-[480px] object-contain block"
+                                                        className="max-w-full max-h-[480px] object-contain block pointer-events-none"
                                                     />
                                                 ) : (
                                                     <div className="w-full h-full flex items-center justify-center bg-slate-900 min-h-[300px] min-w-[400px]">
@@ -439,7 +439,7 @@ export function TrafficViolationSimulation() {
                                                 {/* Dynamic Bounding Box from API */}
                                                 {selectedResult.bbox && selectedResult.bbox.length === 4 && (
                                                     <div
-                                                        className="absolute border-2 border-rose-500 rounded bg-rose-500/10 shadow-[0_0_10px_rgba(244,63,94,0.5)] transition-all duration-300"
+                                                        className="absolute border-2 border-rose-500 rounded bg-rose-500/10 shadow-[0_0_10px_rgba(244,63,94,0.5)] transition-all duration-300 pointer-events-none"
                                                         style={{
                                                             left: `${(selectedResult.bbox[0] / 10).toFixed(2)}%`,
                                                             top: `${(selectedResult.bbox[1] / 10).toFixed(2)}%`,
@@ -454,14 +454,14 @@ export function TrafficViolationSimulation() {
                                                         </div>
                                                     </div>
                                                 )}
-                                            </div>
 
-                                            {!selectedResult.bbox && selectedResult.hasViolation && (
-                                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-rose-600/20 px-4 py-2 rounded-lg border border-rose-500 backdrop-blur-md">
-                                                    <p className="text-white font-bold text-sm uppercase tracking-widest">{selectedResult.violation_type}</p>
-                                                </div>
-                                            )}
-                                        </div>
+                                                {!selectedResult.bbox && selectedResult.hasViolation && (
+                                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-rose-600/20 px-4 py-2 rounded-lg border border-rose-500 backdrop-blur-md pointer-events-none">
+                                                        <p className="text-white font-bold text-sm uppercase tracking-widest">{selectedResult.violation_type}</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </ZoomPanContainer>
                                         <div className="mt-4 bg-white p-3 rounded-lg border border-slate-200 text-[10px] text-slate-500 flex justify-between font-mono">
                                             <span>FILE: {selectedFile?.name}</span>
                                             <span>RESULT_ID: #{((selectedResultIndex || 0) + 1)}_{selectedFile?.name.split('.')[0]}</span>
@@ -596,7 +596,7 @@ export function TrafficViolationSimulation() {
                     </div>
                 </div>
 
-            </div>
+            </div >
         </div >
     );
 }
