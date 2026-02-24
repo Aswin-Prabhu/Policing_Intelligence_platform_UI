@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { ArrowLeft, Camera as CameraIcon, Play, Pause, Volume2 } from 'lucide-react';
+import { ArrowLeft, Camera as CameraIcon, Play, Pause, Volume2, Cpu } from 'lucide-react';
 import { Camera } from './LiveGrid';
 
 interface CameraDetailProps {
@@ -9,6 +9,7 @@ interface CameraDetailProps {
 
 export function CameraDetail({ camera, onBack }: CameraDetailProps) {
   const [isPlaying, setIsPlaying] = useState(true);
+  const [aiOverlayEnabled, setAiOverlayEnabled] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const handlePlayPause = () => {
@@ -51,21 +52,64 @@ export function CameraDetail({ camera, onBack }: CameraDetailProps) {
         {/* Main Video Player */}
         <div className="flex-1 flex flex-col">
           <div className="flex-1 relative bg-gradient-to-br from-[#0a0e1a] to-[#0d1117] flex items-center justify-center overflow-hidden">
-            {camera?.videoUrl ? (
-              <video
-                ref={videoRef}
-                src={camera.videoUrl}
-                autoPlay
-                loop
-                muted
-                className="w-full h-full object-contain"
-                onPlay={() => setIsPlaying(true)}
-                onPause={() => setIsPlaying(false)}
-              />
-            ) : (
-              <CameraIcon className="w-32 h-32 text-gray-700" />
-            )}
-            
+            {(() => {
+              // Parse ID and assign live sources based on prefix
+              // The LiveGrid uses the format: `CAM-AZ-001`, `CAM-AZ-002`, `CAM-AZ-003`, `CAM-AZ-004`, `CAM-AZ-005` mapped to indices 0..4
+              const match = camera?.id?.match(/CAM-[A-Z]Z-(\d+)/);
+              const camIdx = match ? parseInt(match[1], 10) - 1 : -1;
+              const isLiveCam = camIdx >= 0 && camIdx < 5;
+
+              // Only show placeholder if it's NOT a live camera AND has no videoUrl
+              if (!isLiveCam && !camera?.videoUrl) {
+                return <CameraIcon className="w-32 h-32 text-gray-700" />;
+              }
+
+              let videoSrc = camera?.videoUrl || '';
+              if (isLiveCam) {
+                const webrtcUrls = [
+                  "http://localhost:8889/live/anpr/",
+                  "http://localhost:8889/live/anpr1/",
+                  "http://localhost:8889/live/anpr2/",
+                  "http://localhost:8889/live/anpr3/",
+                  "http://localhost:8889/live/anpr4/"
+                ];
+                const camLiveId = `cam_live_0${camIdx + 1}`;
+                const aiStream = `http://79.137.11.169:8000/stream/${camLiveId}`;
+
+                videoSrc = aiOverlayEnabled ? aiStream : webrtcUrls[camIdx];
+              }
+
+              return (
+                <>
+                  {isLiveCam && aiOverlayEnabled ? (
+                    <img
+                      src={videoSrc}
+                      className="w-full h-full object-contain"
+                      alt={`Live stream ${camera?.id}`}
+                    />
+                  ) : isLiveCam ? (
+                    <iframe
+                      src={videoSrc}
+                      className="w-full h-full border-0"
+                      allow="autoplay"
+                      title={`Live feed ${camera?.id}`}
+                    />
+                  ) : (
+                    <video
+                      ref={videoRef}
+                      src={videoSrc}
+                      autoPlay
+                      loop
+                      muted
+                      className="w-full h-full object-contain"
+                      onPlay={() => setIsPlaying(true)}
+                      onPause={() => setIsPlaying(false)}
+                    />
+                  )}
+                </>
+              );
+            })()}
+
             {/* Video Overlay Info */}
             <div className="absolute top-4 left-4 z-10">
               <div className="bg-black/60 backdrop-blur-sm px-4 py-2 rounded-lg">
@@ -76,7 +120,7 @@ export function CameraDetail({ camera, onBack }: CameraDetailProps) {
 
             {/* Playback Controls */}
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-black/60 backdrop-blur-sm px-6 py-3 rounded-lg">
-              <button 
+              <button
                 onClick={handlePlayPause}
                 className="text-white hover:text-cyan-400 transition-colors"
               >
@@ -105,11 +149,10 @@ export function CameraDetail({ camera, onBack }: CameraDetailProps) {
               <div className="absolute top-6 left-0 right-0 flex justify-between">
                 {timelineEvents.map((event, idx) => (
                   <div key={idx} className="flex flex-col items-center gap-1">
-                    <div className={`w-2 h-2 rounded-full ${
-                      event.type === 'alert' ? 'bg-red-500' :
+                    <div className={`w-2 h-2 rounded-full ${event.type === 'alert' ? 'bg-red-500' :
                       event.type === 'motion' ? 'bg-yellow-500' :
-                      'bg-cyan-500'
-                    }`}></div>
+                        'bg-cyan-500'
+                      }`}></div>
                     <span className="text-[10px] text-gray-500">{event.time}</span>
                   </div>
                 ))}
@@ -122,7 +165,19 @@ export function CameraDetail({ camera, onBack }: CameraDetailProps) {
         <div className="w-96 bg-[#0d1117] border-l border-[#1f2937] overflow-y-auto">
           {/* Camera Metadata */}
           <div className="p-4 border-b border-[#1f2937]">
-            <h3 className="text-white mb-4">Camera Metadata</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-white">Camera Metadata</h3>
+              <button
+                onClick={() => setAiOverlayEnabled((v) => !v)}
+                className={`px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-colors ${aiOverlayEnabled
+                  ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
+                  : 'bg-[#1f2937] text-gray-400 border border-transparent'
+                  }`}
+              >
+                <Cpu className="w-3.5 h-3.5" />
+                AI {aiOverlayEnabled ? 'ON' : 'OFF'}
+              </button>
+            </div>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-500">Camera ID</span>
@@ -146,12 +201,11 @@ export function CameraDetail({ camera, onBack }: CameraDetailProps) {
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Status</span>
-                <span className={`${
-                  camera?.status === 'Live' ? 'text-green-400' :
-                  camera?.status === 'degraded' ? 'text-yellow-400' :
-                  'text-gray-400'
-                }`}>
-                  {camera?.status === 'Live' ? 'Online' : camera?.status || 'Online'}
+                <span className={`${camera?.status === 'Live' ? 'text-green-400' :
+                  camera?.status === 'offline' ? 'text-red-400' :
+                    'text-gray-400'
+                  }`}>
+                  {camera?.status === 'Live' ? 'Online' : camera?.status || 'Unknown'}
                 </span>
               </div>
               <div className="flex justify-between">
@@ -187,11 +241,10 @@ export function CameraDetail({ camera, onBack }: CameraDetailProps) {
             <div className="space-y-3">
               {timelineEvents.map((event, idx) => (
                 <div key={idx} className="flex items-start gap-3">
-                  <div className={`w-2 h-2 mt-1 rounded-full ${
-                    event.type === 'alert' ? 'bg-red-500' :
+                  <div className={`w-2 h-2 mt-1 rounded-full ${event.type === 'alert' ? 'bg-red-500' :
                     event.type === 'motion' ? 'bg-yellow-500' :
-                    'bg-cyan-500'
-                  }`}></div>
+                      'bg-cyan-500'
+                    }`}></div>
                   <div className="flex-1">
                     <p className="text-sm text-white">{event.label}</p>
                     <p className="text-xs text-gray-500">{event.time}</p>

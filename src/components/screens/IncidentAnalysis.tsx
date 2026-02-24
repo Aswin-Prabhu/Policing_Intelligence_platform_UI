@@ -135,59 +135,68 @@ export function IncidentAnalysis() {
     const currentResult = results[selectedFileIndex];
     const currentFile = files[selectedFileIndex];
 
+    const accidentVideoRef = useRef<HTMLVideoElement>(null);
+    const ACCIDENT_VIDEO_URL = "https://cdn.gov-cloud.ai/_ENC(nIw4FQRwLOQd0b8T2HcImBUJ5a9zjZEImv/UhJi8/+yUl7Ez+m0qAiCCaOJbNgi5)/CMS/78b40b73-96ae-4c03-9ea5-2310ec61f084_$$_V1_Accident%20jntu%20maingate%2018-11-2019.mkv";
+    const LOOP_START = 4;
+    const LOOP_END = 14;
+
+    // Static forensic snapshots from the accident video
+    const FORENSIC_SNAPSHOTS = [
+        { src: '/evidence/1.png', time: '16:16:20' },
+        { src: '/evidence/2.png', time: '16:16:21' },
+        { src: '/evidence/3.png', time: '16:16:22' },
+    ];
+
+    // Loop the accident video between 4s and 14s
+    useEffect(() => {
+        const vid = accidentVideoRef.current;
+        if (!vid) return;
+
+        const handleLoaded = () => {
+            vid.currentTime = LOOP_START;
+            vid.play().catch(() => { });
+        };
+
+        const handleTimeUpdate = () => {
+            if (vid.currentTime >= LOOP_END) {
+                vid.currentTime = LOOP_START;
+            }
+        };
+
+        vid.addEventListener('loadeddata', handleLoaded);
+        vid.addEventListener('timeupdate', handleTimeUpdate);
+
+        return () => {
+            vid.removeEventListener('loadeddata', handleLoaded);
+            vid.removeEventListener('timeupdate', handleTimeUpdate);
+        };
+    }, [status, selectedFileIndex]);
+
     const MockVideoPlayer = () => (
         <div className="relative aspect-video bg-black rounded-lg overflow-hidden group border border-slate-800 shadow-2xl">
-            {/* Mock Video Content */}
-            <div className="absolute inset-0 flex items-center justify-center">
-                {status === 'completed' && currentFile ? (
-                    <div className="w-full h-full bg-slate-900 relative">
-                        <div className="absolute top-4 left-4 text-green-400 font-mono text-xs bg-black/50 px-2 py-1 rounded border border-green-900/50">
-                            {currentFile.name.toUpperCase()} | 2024-02-11 14:32:05 | FPS: 25
-                        </div>
-
-                        {/* Concept of annotated video */}
-                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-                            <div className="relative">
-                                {/* Car */}
-                                <div className="absolute -left-32 top-10 w-24 h-16 border-2 border-red-500 bg-red-500/10 rounded">
-                                    <div className="absolute -top-6 left-0 bg-red-600 text-white text-[10px] px-1 py-0.5 font-bold">
-                                        CAR ID:2 | 15km/h
-                                    </div>
-                                </div>
-
-                                {/* Bike */}
-                                <div className="absolute left-10 top-0 w-16 h-24 border-2 border-red-500 bg-red-500/10 rounded">
-                                    <div className="absolute -top-6 left-0 bg-red-600 text-white text-[10px] px-1 py-0.5 font-bold animate-pulse">
-                                        ACCIDENT {currentResult?.confidence ? (currentResult.confidence / 100).toFixed(2) : '0.92'}
-                                    </div>
-                                    <div className="absolute -bottom-6 left-0 bg-orange-600 text-white text-[10px] px-1 py-0.5 font-bold">
-                                        NO HELMET
-                                    </div>
-                                </div>
-
-                                {/* Collision Marker */}
-                                <div className="absolute left-0 top-8 w-12 h-12 bg-yellow-500/20 rounded-full animate-ping"></div>
-                            </div>
-                        </div>
-                    </div>
-                ) : (
-                    <FileVideo className="w-16 h-16 text-slate-700" />
-                )}
-            </div>
+            <video
+                ref={accidentVideoRef}
+                src={ACCIDENT_VIDEO_URL}
+                className="w-full h-full object-contain"
+                autoPlay
+                muted
+                playsInline
+            />
 
             {/* Controls Overlay */}
             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-4 opacity-0 group-hover:opacity-100 transition-opacity">
                 <div className="flex items-center justify-between text-white">
                     <div className="flex items-center gap-4">
-                        <button onClick={() => setIsPlaying(!isPlaying)}>
+                        <button onClick={() => {
+                            const v = accidentVideoRef.current;
+                            if (v) { v.paused ? v.play() : v.pause(); setIsPlaying(!v.paused); }
+                        }}>
                             {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
                         </button>
                         <div className="h-1 w-64 bg-slate-700 rounded-full overflow-hidden">
-                            <div className="h-full w-1/3 bg-cyan-500 relative">
-                                <div className="absolute right-0 top-0 bottom-0 w-2 bg-white shadow-[0_0_10px_cyan]"></div>
-                            </div>
+                            <div className="h-full bg-cyan-500 transition-all" style={{ width: '100%' }} />
                         </div>
-                        <span className="text-xs font-mono text-cyan-200">00:06 / 00:15</span>
+                        <span className="text-xs font-mono text-cyan-200">04:00 / 14:00</span>
                     </div>
                     <Maximize2 className="w-4 h-4 hover:text-cyan-400 cursor-pointer" />
                 </div>
@@ -330,7 +339,7 @@ export function IncidentAnalysis() {
                             <div className="flex items-center gap-2 text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">
                                 <Clock className="w-3 h-3" /> Incident Time
                             </div>
-                            <div className="text-xl font-bold text-slate-900">06.50s <span className="text-sm font-normal text-slate-400">in footage</span></div>
+                            <div className="text-xl font-bold text-slate-900">16:16:20 <span className="text-sm font-normal text-slate-400">18-11-2019 Mon</span></div>
                         </div>
                         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                             <div className="flex items-center gap-2 text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">
@@ -390,16 +399,16 @@ export function IncidentAnalysis() {
                                     <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">3 Evidence Files</span>
                                 </h3>
                                 <div className="grid grid-cols-3 gap-2">
-                                    {[1, 2, 3].map(i => (
+                                    {FORENSIC_SNAPSHOTS.map((snap, i) => (
                                         <div key={i} className="aspect-square bg-slate-100 rounded-lg border border-slate-200 relative overflow-hidden group cursor-pointer hover:border-cyan-400 transition-colors">
                                             <div className="absolute inset-0 bg-slate-900/10 group-hover:bg-transparent transition-colors"></div>
                                             <img
-                                                src={`https://placehold.co/400x400/1e293b/FFFFFF/png?text=Evidence+${i}`}
-                                                alt="Evidence"
+                                                src={snap.src}
+                                                alt={`Evidence ${i + 1}`}
                                                 className="w-full h-full object-cover"
                                             />
                                             <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[10px] px-2 py-1">
-                                                t={(5.5 + i * 0.5).toFixed(2)}s
+                                                t={snap.time}
                                             </div>
                                         </div>
                                     ))}
@@ -458,7 +467,7 @@ export function IncidentAnalysis() {
                                                     <div>
                                                         <h5 className="text-sm font-bold text-slate-900">Significant Overspeeding</h5>
                                                         <p className="text-xs text-slate-500 mt-1">
-                                                            Motorcycle (ID:5) recorded at <strong>95.2 km/h</strong> in a 40 km/h zone immediately preceding impact.
+                                                            Motorcycle (ID:5) with <strong>two riders</strong> recorded at <strong>95.2 km/h</strong> in a 40 km/h zone immediately preceding impact with a pedestrian.
                                                             This reduced reaction time by approximately 65%.
                                                         </p>
                                                     </div>
@@ -470,8 +479,8 @@ export function IncidentAnalysis() {
                                                     <div>
                                                         <h5 className="text-sm font-bold text-slate-900">Safety Violation (No Helmet)</h5>
                                                         <p className="text-xs text-slate-500 mt-1">
-                                                            Rider of Vehicle ID 5 detected <strong>without safety helmet</strong> (Confidence: 0.98).
-                                                            This significantly increased the severity risk of the incident.
+                                                            Both riders on Motorcycle ID:5 detected <strong>without safety helmets</strong> (Confidence: 0.98).
+                                                            This significantly increased the severity risk of injuries sustained by the riders.
                                                         </p>
                                                     </div>
                                                 </div>
@@ -482,10 +491,10 @@ export function IncidentAnalysis() {
                                             <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Sequence of Events - {currentFile?.name}</h4>
                                             <div className="relative border-l-2 border-slate-200 ml-3 space-y-6 py-2">
                                                 {[
-                                                    { t: '5.50s', text: 'Motorcycle ID:5 enters frame at high velocity (95 km/h).' },
-                                                    { t: '5.80s', text: 'Vehicle ID:2 (Car) attempts merge into Lane 1.' },
-                                                    { t: '6.00s', text: 'IMPACT DETECTED. G-Force spike observed.' },
-                                                    { t: '6.50s', text: 'Vehicles come to rest. Traffic halted.' }
+                                                    { t: '4.00s', text: 'Motorcycle ID:5 with two riders enters frame at high velocity (95 km/h).' },
+                                                    { t: '4.50s', text: 'Pedestrian detected crossing road near JNTU Main Gate.' },
+                                                    { t: '5.00s', text: 'IMPACT DETECTED. Motorcycle strikes pedestrian. G-Force spike observed.' },
+                                                    { t: '5.50s', text: 'Motorcycle and riders come to rest. Pedestrian down. Traffic halted.' }
                                                 ].map((event, i) => (
                                                     <div key={i} className="pl-6 relative">
                                                         <div className="absolute -left-[9px] top-1.5 w-4 h-4 rounded-full bg-white border-2 border-slate-300"></div>
@@ -514,18 +523,18 @@ export function IncidentAnalysis() {
                                                     <span className="font-bold">Subject:</span> Incident Report generated via Automated CCTV Analysis System (Ref: AI-RUN-2024-892-{selectedFileIndex})
                                                 </p>
                                                 <p className="mb-4">
-                                                    On meticulous examination of the localized CCTV footage (File: {currentFile?.name}), an incident constituting a
-                                                    road traffic accident was definitively observed between the temporal markers of approximately
-                                                    <span className="bg-yellow-100 px-1">5.50 seconds</span> and <span className="bg-yellow-100 px-1">8.50 seconds</span>.
+                                                    On meticulous examination of the CCTV footage captured at JNTU Main Gate on <span className="bg-yellow-100 px-1">18-11-2019 at 16:16:20</span>,
+                                                    a road traffic accident involving a two-wheeler and a pedestrian was definitively observed between the temporal markers of approximately
+                                                    <span className="bg-yellow-100 px-1">4.00 seconds</span> and <span className="bg-yellow-100 px-1">5.50 seconds</span> in the footage.
                                                 </p>
                                                 <p className="mb-4">
-                                                    The automated analysis identified two primary vehicles involved: a four-wheeler (Track ID: 2) and a
-                                                    two-wheeler (Track ID: 5). Preliminary telemetry data indicates the two-wheeler was travelling at a velocity of
+                                                    The automated analysis identified a two-wheeler (Track ID: 5) carrying <strong>two riders</strong> that struck a pedestrian crossing the road.
+                                                    Preliminary telemetry data indicates the two-wheeler was travelling at a velocity of
                                                     <span className="font-bold text-red-600">95.2 km/h</span>, significantly exceeding the mandated limit of 40 km/h.
                                                 </p>
                                                 <p>
-                                                    Furthermore, visual algorithmic verification confirms with high probability that the rider of the
-                                                    aforementioned two-wheeler was not wearing a protective safety helmet at the time of the incident,
+                                                    Furthermore, visual algorithmic verification confirms with high probability that both riders of the
+                                                    aforementioned two-wheeler were not wearing protective safety helmets at the time of the incident,
                                                     in violation of Section 129 of the Motor Vehicles Act.
                                                 </p>
                                             </div>
@@ -560,10 +569,10 @@ export function IncidentAnalysis() {
                                             </thead>
                                             <tbody className="divide-y divide-slate-100 bg-white">
                                                 {[
-                                                    { t: '5.50s', id: '05', type: 'Motorcycle', v: 'Overspeed', d: '95.2 km/h (Limit: 40)', c: '99%', color: 'rose' },
-                                                    { t: '5.50s', id: '05', type: 'Motorcycle', v: 'No Helmet', d: 'Visual Confirmation', c: '98%', color: 'orange' },
-                                                    { t: '6.00s', id: '02', type: 'Car', v: 'Accident', d: 'Collision Detected', c: '92%', color: 'red' },
-                                                    { t: '6.00s', id: '05', type: 'Motorcycle', v: 'Accident', d: 'Collision Detected', c: '92%', color: 'red' },
+                                                    { t: '4.00s', id: '05', type: 'Motorcycle', v: 'Overspeed', d: '95.2 km/h (Limit: 40)', c: '99%', color: 'rose' },
+                                                    { t: '4.00s', id: '05', type: 'Motorcycle', v: 'No Helmet', d: '2 Riders - No Helmets', c: '98%', color: 'orange' },
+                                                    { t: '5.00s', id: '05', type: 'Motorcycle', v: 'Accident', d: 'Struck Pedestrian', c: '96%', color: 'red' },
+                                                    { t: '5.00s', id: 'P1', type: 'Pedestrian', v: 'Accident', d: 'Hit by Motorcycle', c: '96%', color: 'red' },
                                                 ].map((row, i) => (
                                                     <tr key={i} className="hover:bg-slate-50 transition-colors">
                                                         <td className="py-3 px-4 font-mono text-slate-500">{row.t}</td>

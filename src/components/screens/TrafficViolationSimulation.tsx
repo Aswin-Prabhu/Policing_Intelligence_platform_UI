@@ -42,6 +42,9 @@ export function TrafficViolationSimulation() {
         noHelmet: 0
     });
 
+    // Track the displayed image's natural dimensions for accurate bbox mapping
+    const [imgDimensions, setImgDimensions] = useState<{ w: number; h: number }>({ w: 1, h: 1 });
+
     const handleDrop = (e: React.DragEvent) => {
         e.preventDefault();
         const droppedFiles = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/') || f.type.startsWith('video/'));
@@ -78,36 +81,63 @@ export function TrafficViolationSimulation() {
             const file = files[i];
 
             try {
+                // --- Step 1: Submit file to async endpoint ---
                 const formData = new FormData();
                 let url = '';
 
                 if (file.type.startsWith('image/')) {
-                    url = `/api/helmet/detect-image?camera_id=${cameraId}&save_snapshot=true`;
+                    url = `/api/helmet/detect-image-async?camera_id=${cameraId}&save_snapshot=true`;
                     formData.append('image', file);
                 } else {
-                    url = `/api/helmet/detect-video?camera_id=${cameraId}&max_frames=100&sample_rate=5`;
+                    url = `/api/helmet/detect-video-async?camera_id=${cameraId}&max_frames=100&sample_rate=5&structured_output=true`;
                     formData.append('video', file);
                 }
 
-                const response = await fetch(url, {
+                const submitResponse = await fetch(url, {
                     method: 'POST',
-                    headers: {
-                        'accept': 'application/json',
-                    },
+                    headers: { 'accept': 'application/json' },
                     body: formData
                 });
 
-                if (!response.ok) throw new Error(`API error: ${response.statusText}`);
+                if (!submitResponse.ok) throw new Error(`Submit failed: ${submitResponse.statusText}`);
 
-                const apiData = await response.json();
-                console.log(`API Response for ${file.name}:`, apiData);
+                const submitData = await submitResponse.json();
+                const jobId = submitData.job_id;
+                console.log(`Submitted ${file.name}, got job_id: ${jobId}`);
 
-                // Handle the new response structure
-                const data = apiData;
+                if (!jobId) throw new Error('No job_id returned from async endpoint');
+
+                // --- Step 2: Poll for results ---
+                let pollResult: any = null;
+                const maxPolls = 60; // 60 * 2s = 2 min max wait
+                for (let p = 0; p < maxPolls; p++) {
+                    await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2s
+
+                    const pollResponse = await fetch(`/api/helmet/simulation-job/${jobId}?include_result=true`);
+                    if (!pollResponse.ok) {
+                        console.warn(`Poll attempt ${p + 1} failed: ${pollResponse.status}`);
+                        continue;
+                    }
+
+                    const pollData = await pollResponse.json();
+                    console.log(`Poll ${p + 1} for ${file.name}:`, pollData.status);
+
+                    if (pollData.status === 'completed') {
+                        pollResult = pollData.result;
+                        break;
+                    } else if (pollData.status === 'failed') {
+                        throw new Error(pollData.error || 'Job failed on server');
+                    }
+                    // else status is 'queued' or 'running', keep polling
+                }
+
+                if (!pollResult) throw new Error('Polling timed out after 2 minutes');
+
+                // --- Step 3: Map result (same mapping as before) ---
+                const data = pollResult;
                 const firstViolation = data.violations?.[0];
                 const firstVehicle = data.detected_vehicles?.find((v: any) => v.plate) || data.detected_vehicles?.[0];
 
-                // Extract BBox from violation first, then vehicle
                 let box = firstViolation?.riders?.[0]?.box || firstVehicle?.bbox;
 
                 const result: ViolationResult = {
@@ -124,12 +154,8 @@ export function TrafficViolationSimulation() {
                     })() as any,
                     helmet_confidence: (() => {
                         if (!firstViolation) return undefined;
-
-                        // If Triple Riding is present, use the strongest detection confidence
                         const rideConf = firstViolation.riders?.[0] ? Math.round(firstViolation.riders[0].confidence * 100) : 0;
                         const helmetConf = firstViolation.riders?.[0] ? Math.round(firstViolation.riders[0].helmet_confidence * 100) : 0;
-
-                        // If helmet confidence is 0 but it's a violation, use detection confidence as proxy
                         if (helmetConf === 0 && rideConf > 0) return rideConf;
                         return helmetConf > 0 ? helmetConf : (rideConf > 0 ? rideConf : undefined);
                     })(),
@@ -162,7 +188,6 @@ export function TrafficViolationSimulation() {
 
                 setResults(prev => [...prev, result]);
 
-                // Update stats
                 setStats(prev => ({
                     total: prev.total + 1,
                     tripleRiding: result.violation_type === 'Triple Riding' ? prev.tripleRiding + 1 : prev.tripleRiding,
@@ -172,7 +197,6 @@ export function TrafficViolationSimulation() {
             } catch (error) {
                 console.error(`Analysis failed for ${file.name}:`, error);
 
-                // Push a placeholder result on failure to keep the queue in sync
                 const errorResult: ViolationResult = {
                     hasViolation: false,
                     violation_type: undefined,
@@ -429,6 +453,10 @@ export function TrafficViolationSimulation() {
                                                         src={URL.createObjectURL(selectedFile)}
                                                         alt="analyzed"
                                                         className="max-w-full max-h-[480px] object-contain block pointer-events-none"
+                                                        onLoad={(e) => {
+                                                            const img = e.currentTarget;
+                                                            setImgDimensions({ w: img.naturalWidth, h: img.naturalHeight });
+                                                        }}
                                                     />
                                                 ) : (
                                                     <div className="w-full h-full flex items-center justify-center bg-slate-900 min-h-[300px] min-w-[400px]">
@@ -441,10 +469,10 @@ export function TrafficViolationSimulation() {
                                                     <div
                                                         className="absolute border-2 border-rose-500 rounded bg-rose-500/10 shadow-[0_0_10px_rgba(244,63,94,0.5)] transition-all duration-300 pointer-events-none"
                                                         style={{
-                                                            left: `${(selectedResult.bbox[0] / 10).toFixed(2)}%`,
-                                                            top: `${(selectedResult.bbox[1] / 10).toFixed(2)}%`,
-                                                            width: `${((selectedResult.bbox[2] - selectedResult.bbox[0]) / 10).toFixed(2)}%`,
-                                                            height: `${((selectedResult.bbox[3] - selectedResult.bbox[1]) / 10).toFixed(2)}%`,
+                                                            left: `${((selectedResult.bbox[0] / imgDimensions.w) * 100).toFixed(2)}%`,
+                                                            top: `${((selectedResult.bbox[1] / imgDimensions.h) * 100).toFixed(2)}%`,
+                                                            width: `${(((selectedResult.bbox[2] - selectedResult.bbox[0]) / imgDimensions.w) * 100).toFixed(2)}%`,
+                                                            height: `${(((selectedResult.bbox[3] - selectedResult.bbox[1]) / imgDimensions.h) * 100).toFixed(2)}%`,
                                                         }}
                                                     >
                                                         <div className="absolute -top-5 left-0 flex items-center gap-1">

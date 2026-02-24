@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
     Calendar,
     Clock,
@@ -34,17 +34,16 @@ export function TrafficEvidence() {
     const [searchQuery, setSearchQuery] = useState('');
     const [hasSearched, setHasSearched] = useState(false);
     const [expandedRow, setExpandedRow] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
 
-    // Mock Data Generation
+    // Mock Data Generation (used as FALLBACK)
     const generateMockData = (): EvidenceRecord[] => {
         const records: EvidenceRecord[] = [];
         const now = new Date();
 
-        // Generate 20 records spanning last 14 days
         for (let i = 0; i < 20; i++) {
             const date = new Date(now);
             date.setDate(date.getDate() - i);
-            // Add random minutes
             date.setMinutes(date.getMinutes() - (i * 30));
 
             const isExpired = i > 7;
@@ -64,7 +63,54 @@ export function TrafficEvidence() {
         return records;
     };
 
-    const [allRecords] = useState<EvidenceRecord[]>(generateMockData());
+    const [allRecords, setAllRecords] = useState<EvidenceRecord[]>([]);
+
+    // Fetch live violations from API, fallback to mock
+    useEffect(() => {
+        async function fetchViolations() {
+            setIsLoading(true);
+            try {
+                const response = await fetch('/api/helmet/violations?limit=50&hours_ago=72');
+                if (!response.ok) throw new Error(`API ${response.status}`);
+                const data = await response.json();
+
+                const violations = data.violations || data || [];
+                if (!Array.isArray(violations) || violations.length === 0) {
+                    throw new Error('Empty violations response');
+                }
+
+                // Map API response to our EvidenceRecord shape
+                const mapped: EvidenceRecord[] = violations.map((v: any, i: number) => {
+                    const ts = v.timestamp_iso ? new Date(v.timestamp_iso) : (v.timestamp ? new Date(v.timestamp * 1000) : new Date());
+                    const isExpired = (Date.now() - ts.getTime()) > 7 * 24 * 3600 * 1000;
+                    const vType = v.violation_type === 'triplets' ? 'Triple Riding'
+                        : v.violation_type === 'no_helmet' ? 'No Helmet'
+                            : v.violation_type || 'Unknown';
+
+                    return {
+                        id: v.violation_id?.toString() || `V-${i}`,
+                        timestamp: ts,
+                        location: v.camera_id || v.location || 'Unknown',
+                        violationType: vType,
+                        vehicleReg: v.vehicle_plate || '-',
+                        ownerName: v.owner_name || '-',
+                        status: 'Pending Review' as const,
+                        hasSnapshot: !isExpired && !!v.snapshot_path,
+                        imageUrl: v.snapshot_path ? `/api/helmet/snapshot/${v.snapshot_path.split('/').pop()}` : undefined,
+                    };
+                });
+
+                setAllRecords(mapped);
+                console.log(`Loaded ${mapped.length} live violations from API`);
+            } catch (err) {
+                console.warn('Violations API failed, using mock data:', err);
+                setAllRecords(generateMockData());
+            } finally {
+                setIsLoading(false);
+            }
+        }
+        fetchViolations();
+    }, []);
 
     const activeRecords = allRecords.filter(r => r.hasSnapshot);
     // Recent violations are just the first 4 active ones
@@ -150,7 +196,7 @@ export function TrafficEvidence() {
                                     <div className="relative z-10">
                                         <div className="flex items-center gap-2 mb-2">
                                             <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${record.violationType === 'No Helmet' ? 'bg-rose-50 text-rose-700 border-rose-200' :
-                                                    'bg-orange-50 text-orange-700 border-orange-200'
+                                                'bg-orange-50 text-orange-700 border-orange-200'
                                                 }`}>
                                                 {record.violationType}
                                             </span>
@@ -251,7 +297,7 @@ export function TrafficEvidence() {
                                             <div className="w-48">
                                                 <div className="text-xs text-slate-500 font-bold uppercase tracking-wider">Violation</div>
                                                 <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold border mt-0.5 ${record.violationType === 'No Helmet' ? 'bg-rose-50 text-rose-700 border-rose-200' :
-                                                        'bg-blue-50 text-blue-700 border-blue-200'
+                                                    'bg-blue-50 text-blue-700 border-blue-200'
                                                     }`}>
                                                     {record.violationType}
                                                 </span>
